@@ -22,4 +22,4 @@ jobs:
         run: pio test -e native
 
       - name: Build firmware
-        run: pio run -e note4c
+        run: pio run -e note4c -e note4c-diag

@@ -4,7 +4,8 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 
 ## Layout
 
-- `src/main.cpp` – Arduino entry point and hardware glue (currently a stub: latch power, print version, deep sleep 60 s).
+- `src/main.cpp` – Arduino entry point and hardware glue (currently a stub: board init, log wake/battery, deep sleep 120 s; test pattern only in `note4c-diag`).
+- `src/board.*`, `src/epd_ssd2683.*` – power, buttons, battery, display driver.
 - `lib/core` – plain C++17, no Arduino headers; builds for `native` and `note4c`.
 - `test/` – Unity tests, run with `pio test -e native`.
 
@@ -36,6 +37,23 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 | WHITE | 1 |
 | YELLOW | 2 |
 | RED | 3 |
+
+## Board and power (`src/board.cpp`)
+
+- `board::begin()` drives GPIO17 HIGH and `gpio_hold_en`s it, keeps EPD power (6), LED (3, high = off), audio power (42) and amp (46) off, and enables pull-ups on buttons and CHRG_L.
+- `deepSleep(seconds, wakeOnCharger)`: EPD power low and held, latch held through deep sleep with `gpio_deep_sleep_hold_en()` (so the board stays powered on battery), ext1 `ANY_LOW` wake on GPIO0|GPIO18 (+GPIO2 when `wakeOnCharger`), RTC pull-ups on those pins, optional timer wake (`seconds <= 0` = none).
+- Wake mapping: undefined → PowerOn, timer → Timer, ext1 mask bit 0 → ButtonConfirm, bit 18 → ButtonDown, bit 2 → Charger, else Other. Up (GPIO39) is not an RTC pin: it can only be polled while awake.
+- Battery: ADC1_CH3, 12 dB, `esp_adc_cal` (eFuse calibration; Arduino-ESP32 2.x/IDF 4.4 has no curve-fitting scheme), ×2 divider, mean of 10 reads.
+
+## SSD2683 driver (`src/epd_ssd2683.cpp`)
+
+`Epd::show(buf)` runs: GPIO6 high → SPI3 at 10 MHz mode 0 with manual CS → RST high/low (20 ms)/high → wait BUSY → `0xE9 0x01` → `0x10` + 300 rows of 100 bytes → `0x04`, wait BUSY → `0x12 0x00`, wait BUSY → `0x02 0x00`, wait BUSY → `0x07 0xA5` (deep sleep) → SPI released, GPIO6 low and held. BUSY low = busy, timeout 120 s (logged, then continues).
+
+`note4c-diag` (`-DDIAG_TEST_PATTERN`) draws four bars (black/white/red/yellow) plus "Ä Ö Ü ß Test", logs wake cause, battery, charging, and sleeps 120 s.
+
+### Hardware verification
+
+TODO (controller): record bar colours, umlaut legibility, battery mV, wake cause logging, Down-button wake.
 
 ## Rendering (`lib/core`)
 
@@ -88,4 +106,5 @@ Battery arrow: `battery_w ≥ 50` "↑", `≤ −50` "↓", otherwise none.
 
 - `sim` – host PNG simulator (`tools/sim`).
 - `note4c` – device firmware (OTA-capable partition table, two 3 MB app slots).
+- `note4c-diag` – `note4c` plus `-DDIAG_TEST_PATTERN`.
 - `native` – host unit tests for `lib/core`.

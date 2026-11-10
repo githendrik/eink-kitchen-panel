@@ -1,21 +1,48 @@
 #include <Arduino.h>
-#include <driver/gpio.h>
-#include <esp_sleep.h>
+#include <stdlib.h>
+#include "board.h"
 #include "core.h"
+#include "battery.h"
+#include "canvas.h"
+#include "epd_ssd2683.h"
+#include "text.h"
 
-static const gpio_num_t PIN_POWER_LATCH = GPIO_NUM_17;
+static const char* wakeName(board::Wake w) {
+  switch (w) {
+    case board::Wake::PowerOn: return "PowerOn";
+    case board::Wake::Timer: return "Timer";
+    case board::Wake::ButtonConfirm: return "ButtonConfirm";
+    case board::Wake::ButtonDown: return "ButtonDown";
+    case board::Wake::Charger: return "Charger";
+    default: return "Other";
+  }
+}
 
 void setup() {
-  gpio_set_direction(PIN_POWER_LATCH, GPIO_MODE_OUTPUT);
-  gpio_set_level(PIN_POWER_LATCH, 1);
-  gpio_hold_en(PIN_POWER_LATCH);
-
+  board::begin();
   Serial.begin(115200);
   delay(500);
   Serial.printf("eink-kitchen-panel %s (core %d)\n", FIRMWARE_VERSION, core_version());
 
-  esp_sleep_enable_timer_wakeup(60ULL * 1000000ULL);
-  esp_deep_sleep_start();
+  int mv = board::batteryMillivolts();
+  Serial.printf("wake=%s battery=%d mV (%d%%) charging=%d\n", wakeName(board::wakeCause()), mv,
+                batteryPercent(mv), board::charging());
+
+#ifdef DIAG_TEST_PATTERN
+  uint8_t* buf = (uint8_t*)heap_caps_malloc(Canvas::kBytes, MALLOC_CAP_8BIT);
+  if (buf) {
+    Canvas c(buf);
+    c.fill(Color::White);
+    const Color bars[4] = {Color::Black, Color::White, Color::Red, Color::Yellow};
+    for (int i = 0; i < 4; i++) c.fillRect(i * 100, 0, 100, 200, bars[i]);
+    c.fillRect(0, 200, 400, 100, Color::White);
+    drawText(c, 10, 250, Font::Title, "Ä Ö Ü ß Test", Color::Black);
+    Epd().show(buf);
+    free(buf);
+  }
+#endif
+
+  board::deepSleep(120, false);
 }
 
 void loop() {}
