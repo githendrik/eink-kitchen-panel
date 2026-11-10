@@ -20,7 +20,13 @@ FONTS = [
     ("Huge", "DejaVuSans-Bold.ttf", 40),
 ]
 
-CODES = [(c, c) for c in range(0x20, 0x7F)] + [(0x7F, 0x2026)] + [(c, c) for c in range(0xA0, 0x100)]
+# Contiguous 0x20-0xFF; 0x7F holds the ellipsis, 0x80-0x9F are empty (uni None).
+CODES = (
+    [(c, c) for c in range(0x20, 0x7F)]
+    + [(0x7F, 0x2026)]
+    + [(c, None) for c in range(0x80, 0xA0)]
+    + [(c, c) for c in range(0xA0, 0x100)]
+)
 
 
 def gen(name, ttf, size):
@@ -29,6 +35,9 @@ def gen(name, ttf, size):
     bitmap = bytearray()
     glyphs = []
     for code, uni in CODES:
+        if uni is None:
+            glyphs.append((len(bitmap), 0, 0, 0, 0, 0))
+            continue
         ch = chr(uni)
         adv = int(round(font.getlength(ch)))
         # render 1-bit (no antialiasing) on a canvas with baseline at y=ascent
@@ -65,6 +74,7 @@ def gen(name, ttf, size):
     for g in glyphs:
         lines.append("  {%d, %d, %d, %d, %d, %d}," % g)
     lines.append("};")
+    lines.append(f"static_assert(sizeof(font{name}Glyphs) / sizeof(GFXglyph) == {len(glyphs)} && {len(glyphs)} == 0xFF - 0x20 + 1, \"glyph table must be contiguous 0x20-0xFF\");")
     lines.append(f"static const GFXfont font{name} = {{font{name}Bitmaps, font{name}Glyphs, 0x20, 0xFF, {ascent + descent}, {ascent}}};")
     path = os.path.join(OUT, f"font_{name.lower()}.h")
     with open(path, "w") as f:

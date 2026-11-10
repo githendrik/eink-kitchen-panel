@@ -71,6 +71,39 @@ void test_text_umlaut_width() {
   TEST_ASSERT_NOT_EQUAL(textWidth(Font::Body, "A"), 0);
 }
 
+void test_latin1_glyphs_distinct() {
+  const char* s[] = {"\xC3\x84", "\xC3\xA4", "\xC3\xB6", "\xC3\xBC", "\xC3\x9F", "\xC3\xBF", "A", "a"};
+  int wa = textWidth(Font::Body, "A"), wA = textWidth(Font::Body, "\xC3\x84");
+  TEST_ASSERT_EQUAL(wa, wA);  // Ä has the advance of A
+  TEST_ASSERT_NOT_EQUAL(textWidth(Font::Body, "\xC3\x84"), textWidth(Font::Body, "\xC3\xA4"));
+  for (const char* g : s) {
+    int w = textWidth(Font::Body, g);
+    TEST_ASSERT_GREATER_THAN(4, w);
+    TEST_ASSERT_LESS_THAN(16, w);
+  }
+}
+
+void test_umlaut_dots_above_cap_height() {
+  static uint8_t b2[Canvas::kBytes];
+  Canvas a(buf), u(b2);
+  a.fill(Color::White);
+  u.fill(Color::White);
+  drawText(a, 0, 30, Font::Body, "A", Color::Black);
+  drawText(u, 0, 30, Font::Body, "\xC3\x84", Color::Black);
+  int capTop = 30;
+  for (int y = 0; y < 30; y++)
+    for (int x = 0; x < 20; x++)
+      if (a.get(x, y) == Color::Black && y < capTop) capTop = y;
+  bool diffAbove = false;
+  for (int y = 0; y < 40; y++)
+    for (int x = 0; x < 20; x++)
+      if (a.get(x, y) != u.get(x, y)) {
+        if (y >= capTop) TEST_FAIL_MESSAGE("difference at or below cap height");
+        diffAbove = true;
+      }
+  TEST_ASSERT_TRUE(diffAbove);
+}
+
 void test_text_unknown_glyph() {
   TEST_ASSERT_EQUAL(textWidth(Font::Body, "?"), textWidth(Font::Body, "\xF0\x9F\x98\x80"));
 }
@@ -115,6 +148,8 @@ int main() {
   RUN_TEST(test_get_roundtrip);
   RUN_TEST(test_rects);
   RUN_TEST(test_text_umlaut_width);
+  RUN_TEST(test_latin1_glyphs_distinct);
+  RUN_TEST(test_umlaut_dots_above_cap_height);
   RUN_TEST(test_text_unknown_glyph);
   RUN_TEST(test_truncate);
   RUN_TEST(test_text_draws_pixels);

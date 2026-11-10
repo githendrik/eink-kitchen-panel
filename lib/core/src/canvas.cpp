@@ -21,8 +21,10 @@ Color Canvas::get(int x, int y) const {
 }
 
 void Canvas::fillRect(int x, int y, int w, int h, Color c) {
-  for (int j = 0; j < h; j++)
-    for (int i = 0; i < w; i++) pixel(x + i, y + j, c);
+  int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
+  int x1 = x + w > W ? W : x + w, y1 = y + h > H ? H : y + h;
+  for (int j = y0; j < y1; j++)
+    for (int i = x0; i < x1; i++) pixel(i, j, c);
 }
 
 void Canvas::hline(int x, int y, int w, Color c) { fillRect(x, y, w, 1, c); }
