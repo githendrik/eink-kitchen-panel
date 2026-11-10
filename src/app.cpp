@@ -24,7 +24,6 @@ namespace {
 const char* const kTz = "CET-1CEST,M3.5.0,M10.5.0/3";
 constexpr int64_t kPlausibleUtc = 1700000000;
 constexpr int64_t kUnknownTimeSleep = 15 * 60;
-constexpr int64_t kNightPeekSleep = 10 * 60;
 constexpr size_t kBodyMax = 4000;
 
 RTC_DATA_ATTR uint32_t rtcFingerprint = 0;
@@ -71,12 +70,6 @@ bool fetchParsed(const Settings& st, int shift, Kitchen& k, String& body) {
   return true;
 }
 
-int64_t plannedSleep(int64_t now, bool down) {
-  if (phaseAt(now, kTz) == Phase::Night) return down ? kNightPeekSleep : planNight(now, kTz).sleepSeconds;
-  Plan p = planAfterDayRefresh(now, kTz);
-  return dayPlanTooShort(p) ? planNight(now, kTz).sleepSeconds : p.sleepSeconds;
-}
-
 void rememberBody(const String& body, int64_t now) {
   rtcLastSuccessUtc = now;
   rtcStaleShown = false;
@@ -121,52 +114,44 @@ void runWakeCycle() {
   }
   if (action == WakeAction::Maintenance) runMaintenance();
 
-  int shift = wantsNightScreen(in) ? planNight(now, kTz).shift : 0;
+  WakePlan plan{false, 0, 0};
+  if (in.timeKnown) plan = planWake(now, kTz, in.down);
   Kitchen k;
   String body;
-  bool ok = wifiConnect(15000) && fetchParsed(st, shift, k, body);
+  bool ok = wifiConnect(15000) && fetchParsed(st, plan.shift, k, body);
 
   if (!ok) {
     wifiOff();
     if (!in.timeKnown) board::deepSleep(kUnknownTimeSleep, false);
-    if (in.phase == Phase::Day && rtcLastSuccessUtc != 0 && now - rtcLastSuccessUtc > kStaleAfterSeconds &&
-        !rtcStaleShown && rtcBodyLen > 0) {
+    if (!plan.renderNight && phaseAt(now, kTz) == Phase::Day && rtcLastSuccessUtc != 0 &&
+        now - rtcLastSuccessUtc > kStaleAfterSeconds && !rtcStaleShown && rtcBodyLen > 0) {
       rerenderStale(now, pct);
     }
-    board::deepSleep(plannedSleep(now, in.down), false);
+    board::deepSleep(plan.sleepSeconds, false);
   }
 
+  int fetchedShift = plan.shift;
   now = k.serverTimeUtc;
   setSystemTime(now);
-  rememberBody(body, now);
+  plan = planWake(now, kTz, in.down);
 
-  bool night = phaseAt(now, kTz) == Phase::Night && !in.down;
-  int want = 0;
-  int64_t sleepS;
-  if (night) {
-    Plan p = planNight(now, kTz);
-    want = p.shift;
-    sleepS = p.sleepSeconds;
-  } else if (in.down && phaseAt(now, kTz) == Phase::Night) {
-    sleepS = kNightPeekSleep;
-  } else {
-    Plan p = planAfterDayRefresh(now, kTz);
-    if (dayPlanTooShort(p)) {
-      night = true;
-      want = 1;
-      sleepS = planNight(now, kTz).sleepSeconds;
-    } else {
-      sleepS = p.sleepSeconds;
-    }
-  }
-  if (want != shift) {
+  bool render = true;
+  if (plan.shift != fetchedShift) {
     Kitchen k2;
     String body2;
-    if (fetchParsed(st, want, k2, body2)) k = k2;
+    if (fetchParsed(st, plan.shift, k2, body2)) {
+      k = k2;
+      body = body2;
+    } else {
+      render = false;  // never draw a screen from data for the wrong shift
+    }
   }
   wifiOff();
 
-  View v = night ? buildNightView(k, now, kTz, pct) : buildDayView(k, now, kTz, pct, now);
-  if (in.down || fingerprint(v) != rtcFingerprint) showView(v);
-  board::deepSleep(sleepS, false);
+  if (render) {
+    rememberBody(body, now);
+    View v = plan.renderNight ? buildNightView(k, now, kTz, pct) : buildDayView(k, now, kTz, pct, now);
+    if (in.down || fingerprint(v) != rtcFingerprint) showView(v);
+  }
+  board::deepSleep(plan.sleepSeconds, false);
 }

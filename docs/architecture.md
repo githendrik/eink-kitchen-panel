@@ -63,7 +63,7 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 
 `setup()` calls `board::begin()` then `runWakeCycle()` (except in `note4c-diag`). TZ is set to `CET-1CEST,M3.5.0,M10.5.0/3` at the start of each wake. Time comes from the RTC (`time()` > 2023-11 counts as known); after any successful fetch `settimeofday` is set from `server_time`.
 
-Pure decisions live in `lib/core/src/wake.h` (`decideWake`, `wantsNightScreen`, `dayPlanTooShort`; tests in `test/test_wake`).
+Pure decisions live in `lib/core/src/wake.h` (`decideWake`, `planWake`, `dayPlanTooShort`; tests in `test/test_wake`). `planWake(now, tz, down)` returns `{renderNight, shift, sleepSeconds}` and is used by both the success and the failure path.
 
 ```mermaid
 stateDiagram-v2
@@ -71,22 +71,27 @@ stateDiagram-v2
     Wake --> ChargeMe: battery < 5 %
     ChargeMe --> Sleep0: render, sleep until charger
     Wake --> Maintenance: Confirm or no WiFi/backend settings
-    Maintenance --> Sleep15: stub, replaced by Task 8
+    Maintenance --> Sleep0: stub (Task 8 replaces); renders only on Confirm/PowerOn, button-only wake
     Wake --> Fetch: otherwise
     Fetch --> Unknown: fetch failed, time unknown
     Unknown --> Sleep15
     Fetch --> Stale: fetch failed, day, last success > 45 min
     Stale --> SleepPlan: re-render last view once with stale marker
     Fetch --> SleepPlan: fetch failed, keep screen
+    Fetch --> Refetch: success, planWake shift differs from fetched
+    Refetch --> SleepPlan: refetch failed, keep screen
     Fetch --> Render: success, set time
-    Render --> SleepPlan: night screen (22:00-06:00), day view if fingerprint changed or Down
+    Refetch --> Render
+    Render --> SleepPlan: planWake: night or day screen, only if fingerprint changed or Down
     SleepPlan --> [*]: deep sleep
     Sleep0 --> [*]
     Sleep15 --> [*]
 ```
 
 - Day: fetch `shift=0`, redraw only when `fingerprint(View)` changed (or Down pressed), sleep `planAfterDayRefresh`. If that sleep would be < 60 s, the night screen is rendered now (`shift=1`) and the panel sleeps until 06:00.
-- Night timer wake: fetch with `planNight` shift, render night screen, sleep until 06:00. Down at night: live day screen, sleep 10 min; the next timer wake redraws the night screen (night phase on timer always shows night).
+- Night timer wake: fetch with the `planNight` shift, render night screen, sleep until 06:00. If that night sleep would be < 60 s (clock drift just before 06:00) it is treated as day: live day screen, `shift=0`, sleep until just after 06:00. Down at night: live day screen, sleep 10 min; the next timer wake in the night phase renders night again.
+- If the refetch for a different shift fails, the screen is kept (no night screen from shift-0 data). `rtcBody` holds the body that was actually rendered. Response bodies over 16 KB are rejected.
+- Unconfigured device: maintenance is rendered once on Confirm/PowerOn, then deep sleep with no timer.
 - Stale: the last raw `/kitchen` body is kept in RTC slow memory when ≤ 4000 bytes (`rtcBody`). If a fetch fails and the last success is > 45 min old, it is re-rendered once with the stale marker; larger bodies skip this.
 - Settings: NVS namespace `kitchen`, keys `url`, `token` (`Preferences`); WiFi uses the stored station credentials via `WiFi.begin()`, 15 s timeout, WiFi off before sleep. HTTPS uses `setInsecure()` (no certificate pinning).
 - RTC state: fingerprint, last success time, stale-shown flag, last body.

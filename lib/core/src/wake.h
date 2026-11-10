@@ -20,8 +20,15 @@ constexpr int64_t kStaleAfterSeconds = 45 * 60;
 
 WakeAction decideWake(const WakeInput& in);
 
-// True when a Refresh wake should render the night screen (night phase, no Down press).
-bool wantsNightScreen(const WakeInput& in);
-
 // A day plan that would sleep under a minute: render the night screen now instead.
 bool dayPlanTooShort(const Plan& p);
+
+struct WakePlan {
+    bool renderNight;  // night screen (calendar + cat) instead of the day screen
+    int shift;         // /kitchen?shift= value to fetch
+    int64_t sleepSeconds;
+};
+
+// Single source of truth for what to show and how long to sleep. Night sleeps shorter than
+// 60 s (clock drift just before 06:00) are treated as day: live day screen, sleep just past 06:00.
+WakePlan planWake(int64_t nowUtc, const char* tz, bool downPressed);

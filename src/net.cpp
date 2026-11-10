@@ -4,6 +4,9 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
+namespace {
+constexpr int kMaxBody = 16 * 1024;
+}
 bool hasWifiCreds() {
   WiFi.mode(WIFI_STA);
   return WiFi.SSID().length() > 0;
@@ -50,11 +53,11 @@ bool fetchKitchen(const Settings& s, int shift, String& body, int& httpStatus) {
   }
   http.addHeader("Authorization", "Bearer " + s.token);
   httpStatus = http.GET();
-  if (httpStatus != 200) {
+  if (httpStatus != 200 || http.getSize() > kMaxBody) {
     http.end();
     return false;
   }
   body = http.getString();
   http.end();
-  return body.length() > 0;
+  return body.length() > 0 && body.length() <= kMaxBody;
 }

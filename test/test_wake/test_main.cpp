@@ -1,5 +1,8 @@
 #include <unity.h>
 
+#include <cstdlib>
+#include <ctime>
+
 #include "wake.h"
 
 void setUp() {}
@@ -32,39 +35,99 @@ void test_unknown_time_fetches_as_day() {
     TEST_ASSERT_TRUE(decideWake(i) == WakeAction::Refresh);
 }
 
-void test_night_timer_shows_night() {
-    WakeInput i = base();
-    i.phase = Phase::Night;
-    TEST_ASSERT_TRUE(decideWake(i) == WakeAction::Refresh);
-    i.down = false;
-    TEST_ASSERT_TRUE(wantsNightScreen(i));
-}
-
-void test_night_down_is_live_day() {
-    WakeInput i = base();
-    i.phase = Phase::Night;
-    i.down = true;
-    TEST_ASSERT_FALSE(wantsNightScreen(i));
-}
-
-void test_day_never_night_screen() {
-    WakeInput i = base();
-    TEST_ASSERT_FALSE(wantsNightScreen(i));
-}
-
 void test_short_day_sleep() {
     TEST_ASSERT_TRUE(dayPlanTooShort(Plan{Phase::Day, 0, 59}));
     TEST_ASSERT_FALSE(dayPlanTooShort(Plan{Phase::Day, 0, 60}));
 }
 
+static const char* TZ = "CET-1CEST,M3.5.0,M10.5.0/3";
+
+static int64_t local(int y, int mo, int d, int h, int mi, int s = 0) {
+    setenv("TZ", TZ, 1);
+    tzset();
+    tm t{};
+    t.tm_year = y - 1900;
+    t.tm_mon = mo - 1;
+    t.tm_mday = d;
+    t.tm_hour = h;
+    t.tm_min = mi;
+    t.tm_sec = s;
+    t.tm_isdst = -1;
+    return mktime(&t);
+}
+
+void test_plan_normal_day() {
+    WakePlan p = planWake(local(2026, 11, 10, 10, 0), TZ, false);
+    TEST_ASSERT_FALSE(p.renderNight);
+    TEST_ASSERT_EQUAL(0, p.shift);
+    TEST_ASSERT_EQUAL_INT64(900, p.sleepSeconds);
+}
+
+void test_plan_day_close_to_22() {
+    int64_t now = local(2026, 11, 10, 21, 59, 30);
+    WakePlan p = planWake(now, TZ, false);
+    TEST_ASSERT_TRUE(p.renderNight);
+    TEST_ASSERT_EQUAL(1, p.shift);
+    TEST_ASSERT_EQUAL_INT64(local(2026, 11, 11, 6, 0) - now, p.sleepSeconds);
+}
+
+void test_plan_exactly_22() {
+    int64_t now = local(2026, 11, 10, 22, 0);
+    WakePlan p = planWake(now, TZ, false);
+    TEST_ASSERT_TRUE(p.renderNight);
+    TEST_ASSERT_EQUAL(1, p.shift);
+    TEST_ASSERT_EQUAL_INT64(8 * 3600, p.sleepSeconds);
+}
+
+void test_plan_after_midnight() {
+    int64_t now = local(2026, 11, 11, 1, 0);
+    WakePlan p = planWake(now, TZ, false);
+    TEST_ASSERT_TRUE(p.renderNight);
+    TEST_ASSERT_EQUAL(0, p.shift);
+    TEST_ASSERT_EQUAL_INT64(5 * 3600, p.sleepSeconds);
+}
+
+void test_plan_night_down() {
+    WakePlan p = planWake(local(2026, 11, 10, 23, 0), TZ, true);
+    TEST_ASSERT_FALSE(p.renderNight);
+    TEST_ASSERT_EQUAL(0, p.shift);
+    TEST_ASSERT_EQUAL_INT64(600, p.sleepSeconds);
+}
+
+void test_plan_day_down_is_normal() {
+    WakePlan p = planWake(local(2026, 11, 10, 10, 0), TZ, true);
+    TEST_ASSERT_FALSE(p.renderNight);
+    TEST_ASSERT_EQUAL_INT64(900, p.sleepSeconds);
+}
+
+void test_plan_night_near_6_is_day() {
+    int64_t now = local(2026, 11, 11, 5, 59, 30);
+    WakePlan p = planWake(now, TZ, false);
+    TEST_ASSERT_FALSE(p.renderNight);
+    TEST_ASSERT_EQUAL(0, p.shift);
+    TEST_ASSERT_TRUE(now + p.sleepSeconds > local(2026, 11, 11, 6, 0));
+    TEST_ASSERT_TRUE(p.sleepSeconds < 120);
+}
+
+void test_plan_night_just_over_minimum() {
+    WakePlan p = planWake(local(2026, 11, 11, 5, 58, 50), TZ, false);
+    TEST_ASSERT_TRUE(p.renderNight);
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_plan_normal_day);
+    RUN_TEST(test_plan_day_close_to_22);
+    RUN_TEST(test_plan_exactly_22);
+    RUN_TEST(test_plan_after_midnight);
+    RUN_TEST(test_plan_night_down);
+    RUN_TEST(test_plan_day_down_is_normal);
+    RUN_TEST(test_plan_night_near_6_is_day);
+    RUN_TEST(test_plan_night_just_over_minimum);
+
     RUN_TEST(test_battery_critical_wins);
     RUN_TEST(test_confirm_or_missing_settings_is_maintenance);
     RUN_TEST(test_unknown_time_fetches_as_day);
-    RUN_TEST(test_night_timer_shows_night);
-    RUN_TEST(test_night_down_is_live_day);
-    RUN_TEST(test_day_never_night_screen);
     RUN_TEST(test_short_day_sleep);
     return UNITY_END();
 }
