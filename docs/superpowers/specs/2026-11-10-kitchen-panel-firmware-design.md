@@ -11,9 +11,39 @@ life is the main design driver: the panel sleeps most of the time.
 
 ## Hardware
 
-ZECTRIX NOTE4C devkit: ESP32-S3, 16 MB flash, 8 MB PSRAM, 4.2" 400×300
+ZECTRIX NOTE4C devkit: ESP32-S3 N16R8 (16 MB flash, 8 MB PSRAM), 4.2" 400×300
 **four-colour BWRY** (black/white/red/yellow) e-paper, built-in ~2000 mAh battery,
-USB-C, physical buttons. Docs: https://wiki.zectrix.com (NOTE4 dev guide, spec page).
+USB-C, physical buttons. Docs: https://wiki.zectrix.com (NOTE4 dev guide — the
+NOTE4C keeps the NOTE4 mainboard, only the display module differs).
+
+Verified facts (Nov 2026; sources: NOTE4 wiki pin map + the vendor 4-colour
+firmware `itopinion/youn-ink-fourcolor-firmware`,
+`main/boards/zectrix-s3-epaper-4.2/`). Device on hand: MAC 84:c7:bb:4d:be:ac;
+full factory flash backed up to `backup/note4c-factory-84c7bb4dbeac.bin`
+(sha256 ac731eaf…4b54, gitignored).
+
+| Function | GPIO | Notes |
+|---|---|---|
+| **Power latch** | 17 | Must be driven HIGH and held (`gpio_hold_en`) or the board switches off on battery |
+| EPD power enable | 6 | HIGH = on; switch off before deep sleep |
+| EPD SPI | SCK 12, MOSI 13, CS 11, DC 10, RST 9, BUSY 8 | BUSY **low = busy**; 4-colour refresh can take >10 s (vendor timeout 120 s) |
+| Confirm / BOOT button | 0 | active low, RTC-capable → deep-sleep wake |
+| Down / Power button | 18 | active low, RTC-capable → deep-sleep wake (also hardware power-on) |
+| Up button | 39 | active low, **not** RTC-capable → cannot wake from deep sleep |
+| Charging (CHRG_L) | 2 | low = charging, RTC-capable |
+| Charge full (STDBY_H) | 1 | high = full |
+| Battery ADC | 4 | ADC1_CH3, 12 dB atten, ×2 divider; vendor %: `(-v² + 9016v − 19189000)/10000` (v in mV), clamp 0–100 |
+| Status LED | 3 | green, active low |
+| Audio power / amp | 42 / 46 | keep off |
+
+Display controller **SSD2683**, 4-colour mode: 2 bits per pixel, MSB-first,
+100 bytes per row, 300 rows (30 000 bytes). Colour codes: **black 0, white 1,
+yellow 2, red 3**. Sequence: EPD power on → RST high/low(20 ms)/high → wait BUSY
+→ cmd `0xE9` data `0x01` → cmd `0x10` + 30 000 bytes → cmd `0x04` (power on),
+wait BUSY → cmd `0x12` data `0x00` (refresh), wait BUSY → cmd `0x02` data `0x00`
+(power off), wait BUSY → cmd `0x07` data `0xA5` (deep sleep) → EPD power off.
+Full refresh only; no partial refresh in 4-colour mode (vendor firmware never
+uses one) — settled.
 
 ## Goals
 
@@ -96,20 +126,21 @@ the calendar date is already correct, so `shift=0` for both screens.
 
 ### Battery empty / recovery
 
-After the "charge me" screen, wake on button **or** on USB power appearing, if
-the NOTE4C exposes a charge/VBUS-detect signal on an RTC GPIO (open item). If it
-doesn't, a button press is required after charging and the "charge me" screen
-says so ("Nach dem Laden Taste drücken").
+After the "charge me" screen, deep sleep waking on a button **or** on CHRG_L
+(GPIO2) going low, i.e. as soon as the charger is plugged in. The charge wake is
+armed only in this state (it would otherwise re-wake immediately while charging).
 
 ### Buttons
 
-Buttons on RTC-capable GPIOs (ESP32-S3: GPIO 0–21) wake the chip from deep sleep
-via ext1; the wake cause identifies which button. Proposed mapping (pins to be
-confirmed from the NOTE4C schematic):
+Deep-sleep wake via ext1 ANY_LOW on GPIO0 and GPIO18 (GPIO39 cannot wake).
+Mapping (assistant's call, from the hardware):
 
-- Button 1: maintenance mode (settings + status + OTA check).
-- Button 2: refresh now.
-- Button 3 (if present): OTA check only.
+- **Confirm (front, GPIO0)**: maintenance mode (status screen + settings page +
+  OTA check). Inside maintenance mode, Confirm again exits.
+- **Down (side, GPIO18)**: refresh now (normal fetch + redraw, ignores the
+  unchanged-fingerprint skip).
+- **Up (side, GPIO39)**: only usable while awake — in maintenance mode it
+  triggers "install update now" if one was found.
 
 ### Settings & OTA (reuse from eink-desk-panel)
 
@@ -122,11 +153,9 @@ confirmed from the NOTE4C schematic):
 
 ## Constraints
 
-- 4-colour BWRY refresh is full-screen and slow (~15–20 s); assume **no partial
-  refresh**. Open item: check the controller datasheet for a partial-window mode;
-  only adopt it if it doesn't cause ghosting.
-- Toolchain: PlatformIO + Arduino on ESP32-S3, matching eink-desk-panel
-  (unless the NOTE4C reference firmware forces ESP-IDF; see open items).
+- 4-colour BWRY refresh is full-screen and slow (>10 s); no partial refresh.
+- Toolchain: PlatformIO + Arduino on ESP32-S3, matching eink-desk-panel; own
+  small SSD2683 driver following the vendor sequence above.
 - Timezone Europe/Zurich, DST-aware.
 
 ## Documentation (user requirement)
@@ -147,7 +176,6 @@ should understand the device without reading code.
 
 ## Open items
 
-- NOTE4C: display controller model, SPI pins, button pins and count, battery
-  ADC pin/divider, any power-gating of the panel/peripherals.
-- Partial-refresh support on the controller.
+- Battery thresholds: start with warning < 20 %, critical < 5 % (vendor curve),
+  tune after observing a real discharge.
 - Label language: **German** (user decision) — all on-screen labels and messages; fonts must cover umlauts/ß.
