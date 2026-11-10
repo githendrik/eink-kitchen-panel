@@ -1,0 +1,12 @@
+{
+  "screen": "maintenance",
+  "maint": {
+    "ip": "192.168.1.42",
+    "version": "v0.1.0",
+    "ssid": "Kueche-WLAN",
+    "updateText": "aktuell",
+    "batteryMv": 3870,
+    "batteryPct": 64,
+    "lastFetch": "2026-11-10 06:39"
+  }
+}

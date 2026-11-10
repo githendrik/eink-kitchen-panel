@@ -1,0 +1,19 @@
+{
+  "screen": "day",
+  "now": "2026-11-10T17:40:00+01:00",
+  "panelBatteryPct": 12,
+  "lastSuccess": "2026-11-10T17:39:00+01:00",
+  "kitchen": {
+    "calendar": {
+      "today": {"label": "Heute", "date": "2026-11-10", "events": [
+        {"summary": "Zahnarzt Hendrik", "start": "2026-11-10T17:00:00", "end": "2026-11-10T18:00:00", "allDay": false},
+        {"summary": "Elternabend", "start": "2026-11-10T19:30:00", "end": "2026-11-10T21:00:00", "allDay": false}
+      ]},
+      "tomorrow": {"label": "Morgen", "date": "2026-11-11", "events": []},
+      "fetched_at": "2026-11-10T17:39:00+01:00"
+    },
+    "solar": {"pv_w": 300, "load_w": 1800, "grid_w": 600, "battery_soc": 9, "battery_w": -400,
+      "updated_at": "2026-11-10T16:39:12Z", "source": "sim", "stale": false},
+    "server_time": "2026-11-10T17:40:00+01:00"
+  }
+}
