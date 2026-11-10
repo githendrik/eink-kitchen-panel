@@ -53,6 +53,23 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
   - `planAfterDayRefresh`: sleep `min(900 s, time to 22:00)`, shift 0; outside the day window it defers to `planNight`.
   - `planNight`: sleep until the next 06:00 local (DST-aware); `shift=1` from 22:00 to midnight, `0` after midnight.
 
+## View model (`lib/core/src/view.h`)
+
+`buildDayView` / `buildNightView` turn `Kitchen` into a render-ready `View` (German UTF-8 text, arrows kept; the renderer maps unsupported glyphs). Powers are shown in kW with one decimal (half away from zero). `headerDate` uses `today.date` ("Di 10. Nov"). Labels are "Heute"/"Morgen"; if `today.date` differs from the local date of `now` (night view, shift=1) they are "Morgen"/"Übermorgen". All-day events are listed first ("ganztägig"), then timed ones ("HH:MM").
+
+| Warning (red) | Condition |
+|---|---|
+| `warnGridImport` | `grid_w > 50` (≤ 50 is no warning) |
+| `warnHomeBatteryLow` | home battery SoC < 15 % |
+| `warnPanelBattery` | panel battery < 20 % |
+| `solarStale` | backend `stale` or `updated_at` > 30 min before now (shows "Stand HH:MM") |
+| `solarMissing` | `solar` is null |
+| `dataStale` | `lastSuccessUtc` > 45 min before now; `lastSuccessUtc == 0` ("never") is not stale; never set in the night view |
+
+Battery arrow: `battery_w ≥ 50` "↑", `≤ −50` "↓", otherwise none.
+
+`fingerprint` is FNV-1a over: screen, header date, PV/load/grid rounded to 100 W, grid direction, SoC in 5 % steps (floor), arrow, all warning flags, labels and all event times/titles. It excludes `updatedAt` and clock times, so a refresh only redraws on visible change.
+
 ## Environments
 
 - `note4c` – device firmware (OTA-capable partition table, two 3 MB app slots).
