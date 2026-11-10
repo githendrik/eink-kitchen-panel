@@ -8,6 +8,7 @@
 namespace {
 constexpr int kMargin = 12;
 constexpr int kMaxToday = 5;
+constexpr int kBannerH = 92;  // top of the calendar area (24 px warning bar + 68 px compact banner = same)
 
 // 12x12 arrow; dir 0=right 1=left 2=up 3=down. (x, y) is the top-left.
 void arrow(Canvas& c, int x, int y, int dir, Color col) {
@@ -67,7 +68,7 @@ void drawGrid(Canvas& c, int x, int y, const std::string& text, Color col) {
 }
 
 void drawBanner(Canvas& c, const View& v, int top, bool compact) {
-    int bh = compact ? 68 : 92;
+    int bh = compact ? 68 : kBannerH;
     c.fillRect(0, top, Canvas::W, bh, Color::Yellow);
     c.fillRect(0, top + bh - 3, Canvas::W, 3, Color::Black);
 
@@ -176,7 +177,7 @@ void renderDay(Canvas& c, const View& v) {
         top = 24;
     }
     drawBanner(c, v, top, v.warnPanelBattery);
-    drawCalendar(c, v, 92, kMaxToday, 3);
+    drawCalendar(c, v, kBannerH, kMaxToday, 3);
     if (v.dataStale)
         put(c, kMargin, 296, Font::Small, "Daten veraltet · " + v.staleText, Color::Red, 250);
     int w = textWidth(Font::Small, v.updatedAt.c_str());
@@ -185,10 +186,19 @@ void renderDay(Canvas& c, const View& v) {
 
 void renderNight(Canvas& c, const View& v) {
     c.fill(Color::White);
-    drawCalendar(c, v, 4, kMaxToday, 3);
-    c.fillRect(0, 236, Canvas::W, 3, Color::Black);
-    drawText(c, kMargin, 282, Font::Huge, "Gute Nacht", Color::Black, 270);
-    cat::draw(c, Canvas::W - kMargin - cat::W, 248);
+    int top = 0;
+    if (v.warnPanelBattery) {
+        c.fillRect(0, 0, Canvas::W, 24, Color::Red);
+        centered(c, 17, Font::BodyBold, "Panel-Akku schwach - bitte laden", Color::White);
+        top = 24;
+    }
+    int bh = v.warnPanelBattery ? 68 : kBannerH;
+    c.fillRect(0, top, Canvas::W, bh, Color::Yellow);
+    c.fillRect(0, top + bh - 3, Canvas::W, 3, Color::Black);
+    int mid = top + (bh - 3) / 2;
+    drawText(c, kMargin, mid + 14, Font::Huge, "Gute Nacht", Color::Black, 270);
+    cat::draw(c, Canvas::W - kMargin - cat::W, mid - cat::H / 2);
+    drawCalendar(c, v, kBannerH, kMaxToday, 3);
 }
 
 void renderChargeMe(Canvas& c) {

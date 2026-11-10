@@ -1,7 +1,7 @@
 #pragma once
 #include "canvas.h"
 
-// Sleeping cat, roughly 64x40 px, drawn procedurally: yellow body, black outline.
+// Sleeping cat, roughly 64x40 px, drawn procedurally: white body with black outline (legible on the yellow banner).
 namespace cat {
 constexpr int W = 64, H = 40;
 
@@ -13,7 +13,7 @@ inline void ellipse(Canvas& c, int cx, int cy, int a, int b, Color col) {
 
 inline void blob(Canvas& c, int cx, int cy, int a, int b) {
     ellipse(c, cx, cy, a, b, Color::Black);
-    ellipse(c, cx, cy, a - 2, b - 2, Color::Yellow);
+    ellipse(c, cx, cy, a - 2, b - 2, Color::White);
 }
 
 inline void triangle(Canvas& c, int x0, int y0, int x1, int y1, int x2, int y2, Color col) {
@@ -38,8 +38,8 @@ inline void draw(Canvas& c, int x, int y) {
     blob(c, x + 14, y + 25, 12, 10);   // head
     triangle(c, x + 4, y + 20, x + 5, y + 6, x + 13, y + 16, Color::Black);   // ears
     triangle(c, x + 15, y + 16, x + 23, y + 6, x + 24, y + 21, Color::Black);
-    triangle(c, x + 7, y + 17, x + 7, y + 10, x + 12, y + 16, Color::Yellow);
-    triangle(c, x + 17, y + 16, x + 21, y + 10, x + 21, y + 18, Color::Yellow);
+    triangle(c, x + 7, y + 17, x + 7, y + 10, x + 12, y + 16, Color::White);
+    triangle(c, x + 17, y + 16, x + 21, y + 10, x + 21, y + 18, Color::White);
     c.hline(x + 6, y + 26, 5, Color::Black);   // closed eyes
     c.hline(x + 17, y + 26, 5, Color::Black);
     c.pixel(x + 5, y + 25, Color::Black);
