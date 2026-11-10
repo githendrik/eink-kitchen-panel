@@ -18,9 +18,11 @@ constexpr gpio_num_t PIN_AUDIO_POWER = GPIO_NUM_42;
 constexpr gpio_num_t PIN_AMP = GPIO_NUM_46;
 
 void outputLevel(gpio_num_t pin, int level) {
-  gpio_hold_dis(pin);
-  gpio_set_direction(pin, GPIO_MODE_OUTPUT);
+  // Level and direction are configured while the pad is still held, so releasing the hold
+  // never exposes a floating or wrong level.
   gpio_set_level(pin, level);
+  gpio_set_direction(pin, GPIO_MODE_OUTPUT);
+  gpio_hold_dis(pin);
 }
 
 void input(gpio_num_t pin, bool pullup) {

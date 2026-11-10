@@ -4,7 +4,8 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 
 ## Layout
 
-- `src/main.cpp` – Arduino entry point and hardware glue (currently a stub: board init, log wake/battery, deep sleep 120 s; test pattern only in `note4c-diag`).
+- `src/main.cpp` – Arduino entry point; runs `runWakeCycle()` (test pattern only in `note4c-diag`).
+- `src/app.*`, `src/net.*`, `src/settings.*`, `src/maintenance.*` – wake cycle, WiFi/HTTP, NVS settings, maintenance stub.
 - `src/board.*`, `src/epd_ssd2683.*` – power, buttons, battery, display driver.
 - `lib/core` – plain C++17, no Arduino headers; builds for `native` and `note4c`.
 - `test/` – Unity tests, run with `pio test -e native`.
@@ -53,7 +54,42 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 
 ### Hardware verification
 
-TODO (controller): record bar colours, umlaut legibility, battery mV, wake cause logging, Down-button wake.
+- Diag build (`note4c-diag`) flashed on device MAC `84:c7:bb:4d:be:ac` on 2026-11-10.
+- After a 120 s deep sleep on USB power the serial log showed `wake=Timer battery=4140 mV (99%) charging=0`.
+- The display sequence completed without a busy timeout.
+- Pending (needs a human at the device): colour bar and umlaut legibility, Down/Confirm button wake, battery-only latch hold.
+
+## Wake cycle (`src/app.cpp`)
+
+`setup()` calls `board::begin()` then `runWakeCycle()` (except in `note4c-diag`). TZ is set to `CET-1CEST,M3.5.0,M10.5.0/3` at the start of each wake. Time comes from the RTC (`time()` > 2023-11 counts as known); after any successful fetch `settimeofday` is set from `server_time`.
+
+Pure decisions live in `lib/core/src/wake.h` (`decideWake`, `wantsNightScreen`, `dayPlanTooShort`; tests in `test/test_wake`).
+
+```mermaid
+stateDiagram-v2
+    [*] --> Wake
+    Wake --> ChargeMe: battery < 5 %
+    ChargeMe --> Sleep0: render, sleep until charger
+    Wake --> Maintenance: Confirm or no WiFi/backend settings
+    Maintenance --> Sleep15: stub, replaced by Task 8
+    Wake --> Fetch: otherwise
+    Fetch --> Unknown: fetch failed, time unknown
+    Unknown --> Sleep15
+    Fetch --> Stale: fetch failed, day, last success > 45 min
+    Stale --> SleepPlan: re-render last view once with stale marker
+    Fetch --> SleepPlan: fetch failed, keep screen
+    Fetch --> Render: success, set time
+    Render --> SleepPlan: night screen (22:00-06:00), day view if fingerprint changed or Down
+    SleepPlan --> [*]: deep sleep
+    Sleep0 --> [*]
+    Sleep15 --> [*]
+```
+
+- Day: fetch `shift=0`, redraw only when `fingerprint(View)` changed (or Down pressed), sleep `planAfterDayRefresh`. If that sleep would be < 60 s, the night screen is rendered now (`shift=1`) and the panel sleeps until 06:00.
+- Night timer wake: fetch with `planNight` shift, render night screen, sleep until 06:00. Down at night: live day screen, sleep 10 min; the next timer wake redraws the night screen (night phase on timer always shows night).
+- Stale: the last raw `/kitchen` body is kept in RTC slow memory when ≤ 4000 bytes (`rtcBody`). If a fetch fails and the last success is > 45 min old, it is re-rendered once with the stale marker; larger bodies skip this.
+- Settings: NVS namespace `kitchen`, keys `url`, `token` (`Preferences`); WiFi uses the stored station credentials via `WiFi.begin()`, 15 s timeout, WiFi off before sleep. HTTPS uses `setInsecure()` (no certificate pinning).
+- RTC state: fingerprint, last success time, stale-shown flag, last body.
 
 ## Rendering (`lib/core`)
 

@@ -20,9 +20,9 @@ constexpr int ROWS = 300;
 spi_device_handle_t spi = nullptr;
 
 void setPower(int level) {
-  gpio_hold_dis(PIN_POWER);
-  gpio_set_direction(PIN_POWER, GPIO_MODE_OUTPUT);
   gpio_set_level(PIN_POWER, level);
+  gpio_set_direction(PIN_POWER, GPIO_MODE_OUTPUT);
+  gpio_hold_dis(PIN_POWER);
   gpio_hold_en(PIN_POWER);
 }
 
@@ -42,7 +42,8 @@ void tx(const uint8_t* data, int len) {
   memset(&t, 0, sizeof(t));
   t.length = 8 * len;
   t.tx_buffer = data;
-  spi_device_polling_transmit(spi, &t);
+  esp_err_t err = spi_device_polling_transmit(spi, &t);
+  if (err != ESP_OK) Serial.printf("spi transmit failed: %d\n", err);
 }
 
 void sendCmd(uint8_t c) {
@@ -88,13 +89,15 @@ void initSpi() {
   bus.quadwp_io_num = -1;
   bus.quadhd_io_num = -1;
   bus.max_transfer_sz = ROW_BYTES * ROWS;
-  spi_bus_initialize(SPI3_HOST, &bus, SPI_DMA_CH_AUTO);
+  esp_err_t err = spi_bus_initialize(SPI3_HOST, &bus, SPI_DMA_CH_AUTO);
+  if (err != ESP_OK) Serial.printf("spi_bus_initialize failed: %d\n", err);
   spi_device_interface_config_t dev = {};
   dev.spics_io_num = -1;
   dev.clock_speed_hz = 10 * 1000 * 1000;
   dev.mode = 0;
   dev.queue_size = 1;
-  spi_bus_add_device(SPI3_HOST, &dev, &spi);
+  err = spi_bus_add_device(SPI3_HOST, &dev, &spi);
+  if (err != ESP_OK) Serial.printf("spi_bus_add_device failed: %d\n", err);
 }
 
 void deinitSpi() {

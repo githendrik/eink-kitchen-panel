@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <stdlib.h>
+#include "app.h"
 #include "board.h"
 #include "core.h"
 #include "battery.h"
@@ -28,6 +29,10 @@ void setup() {
   Serial.printf("wake=%s battery=%d mV (%d%%) charging=%d\n", wakeName(board::wakeCause()), mv,
                 batteryPercent(mv), board::charging());
 
+#ifndef DIAG_TEST_PATTERN
+  runWakeCycle();
+#endif
+
 #ifdef DIAG_TEST_PATTERN
   uint8_t* buf = (uint8_t*)heap_caps_malloc(Canvas::kBytes, MALLOC_CAP_8BIT);
   if (buf) {
@@ -39,6 +44,8 @@ void setup() {
     drawText(c, 10, 250, Font::Title, "Ä Ö Ü ß Test", Color::Black);
     Epd().show(buf);
     free(buf);
+  } else {
+    Serial.println("framebuffer alloc failed");
   }
 #endif
 
