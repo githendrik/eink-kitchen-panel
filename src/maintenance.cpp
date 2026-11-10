@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <esp_heap_caps.h>
+#include <esp_ota_ops.h>
 #include <esp_system.h>
 
 #include "battery.h"
@@ -39,6 +40,12 @@ bool pressed(int pin) {
   delay(kDebounceMs);
   return digitalRead(pin) == LOW;
 }
+
+// Exposes the time of the last HTTP request served by the portal, for the idle timeout.
+class Portal : public WiFiManager {
+ public:
+  unsigned long lastWebAccess() const { return _webPortalAccessed; }
+};
 
 bool saved = false;
 WiFiManagerParameter* pUrl = nullptr;
@@ -77,12 +84,12 @@ void runMaintenance() {
   m.batteryMv = mv;
   m.batteryPct = batteryPercent(mv);
   m.ip = "-";
-  m.updateText = configured ? "pruefe..." : "-";
+  m.updateText = configured ? "prüfe…" : "-";
   m.ssid = configured ? std::string(WiFi.SSID().c_str()) : std::string(kApName);
   m.lastFetch = "-";
   draw(m);  // redraw 1 of max 2
 
-  WiFiManager wm;
+  Portal wm;
   wm.setConfigPortalBlocking(false);
   wm.setConfigPortalTimeout(600);
   String urlDefault = st.backendUrl.length() ? st.backendUrl : String("http://home-apis:3000");
@@ -100,19 +107,23 @@ void runMaintenance() {
   if (configured) {
     connected = wifiConnect(15000);
     if (connected) {
+      esp_ota_mark_app_valid_cancel_rollback();
       wm.startWebPortal();
       m.ip = WiFi.localIP().toString().c_str();
       ota = otaCheckForUpdate();
     }
-  } else {
+  }
+  if (!connected) {
+    // Unconfigured, or configured but WiFi unreachable: let the user (re)enter WiFi and settings.
     wm.startConfigPortal(kApName);
     m.ip = WiFi.softAPIP().toString().c_str();
+    m.ssid = kApName;
   }
 
   if (configured) {
-    if (!connected) m.updateText = "kein WLAN";
-    else if (ota.available) m.updateText = std::string(ota.version.c_str()) + " verfuegbar - Taste Hoch";
-    else m.updateText = ota.checked ? "aktuell" : "Pruefung fehlgeschlagen";
+    if (!connected) m.updateText = "kein WLAN - Setup-Portal";
+    else if (ota.available) m.updateText = "Update " + std::string(ota.version.c_str()) + " verfügbar - Taste Hoch";
+    else m.updateText = ota.checked ? "aktuell" : "Prüfung fehlgeschlagen";
   }
   draw(m);  // redraw 2 of max 2
 
@@ -124,19 +135,27 @@ void runMaintenance() {
   }
 
   uint32_t lastActivity = millis();
+  unsigned long lastWeb = wm.lastWebAccess();
   while (millis() - lastActivity < kIdleMs) {
     wm.process();
+    if (wm.lastWebAccess() != lastWeb) {
+      lastWeb = wm.lastWebAccess();
+      lastActivity = millis();
+    }
     if (saved) {
       delay(1500);  // let the portal answer the browser
       finish(settingsComplete(loadSettings()) && hasWifiCreds());
     }
     if (pressed(kPinConfirm)) finish(configured);
     if (ota.available && pressed(kPinUp)) {
+      lastActivity = millis();
       if (otaApplyUpdate(ota)) {
         delay(200);
         esp_restart();
       }
-      ota.available = false;  // failed: keep running, no retry loop, no redraw
+      ota.available = false;  // failed: no retry loop
+      m.updateText = "Update fehlgeschlagen";
+      draw(m);  // third and last redraw
     }
     delay(10);
   }

@@ -1,0 +1,12 @@
+{
+  "screen": "maintenance",
+  "maint": {
+    "ip": "192.168.100.142",
+    "version": "v0.10.11",
+    "ssid": "Kueche-WLAN",
+    "updateText": "Update v0.10.12 verfügbar - Taste Hoch",
+    "batteryMv": 3870,
+    "batteryPct": 64,
+    "lastFetch": "2026-11-10 06:39"
+  }
+}

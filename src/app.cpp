@@ -119,7 +119,9 @@ void runWakeCycle() {
   if (in.timeKnown) plan = planWake(now, kTz, in.down);
   Kitchen k;
   String body;
-  bool ok = wifiConnect(15000) && fetchParsed(st, plan.shift, k, body);
+  bool wifiUp = wifiConnect(15000);
+  if (wifiUp) esp_ota_mark_app_valid_cancel_rollback();
+  bool ok = wifiUp && fetchParsed(st, plan.shift, k, body);
 
   if (!ok) {
     wifiOff();
@@ -131,7 +133,6 @@ void runWakeCycle() {
     board::deepSleep(plan.sleepSeconds, false);
   }
 
-  esp_ota_mark_app_valid_cancel_rollback();
   int fetchedShift = plan.shift;
   now = k.serverTimeUtc;
   setSystemTime(now);

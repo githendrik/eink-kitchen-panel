@@ -93,7 +93,7 @@ stateDiagram-v2
 - Night timer wake: fetch with the `planNight` shift, render night screen, sleep until 06:00. If that night sleep would be < 60 s (clock drift just before 06:00) it is treated as day: live day screen, `shift=0`, sleep until just after 06:00. Down at night: live day screen, sleep 10 min; the next timer wake in the night phase renders night again.
 - If the refetch for a different shift fails, the screen is kept (no night screen from shift-0 data). `rtcBody` holds the body that was actually rendered. Response bodies over 16 KB are rejected.
 - Unconfigured device (no stored WiFi credentials or no `url`/`token`): maintenance only on Confirm/PowerOn, then deep sleep with no timer. See "Maintenance mode".
-- The first successful `/kitchen` fetch calls `esp_ota_mark_app_valid_cancel_rollback()` (rollback is enabled by `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`), so a bad OTA image reverts.
+- The first successful WiFi connect of a normal wake cycle (or maintenance) calls `esp_ota_mark_app_valid_cancel_rollback()`; the core's bootloader has rollback enabled, so a bad OTA image that never gets that far reverts. An image that connects but is otherwise broken is not rolled back and must be reflashed via USB (`docs/release.md`).
 - Stale: the last raw `/kitchen` body is kept in RTC slow memory when ≤ 4000 bytes (`rtcBody`). If a fetch fails and the last success is > 45 min old, it is re-rendered once with the stale marker; larger bodies skip this.
 - Settings: NVS namespace `kitchen`, keys `url`, `token` (`Preferences`); WiFi uses the stored station credentials via `WiFi.begin()`, 15 s timeout, WiFi off before sleep. HTTPS uses `setInsecure()` (no certificate pinning).
 - RTC state: fingerprint, last success time, stale-shown flag, last body.
@@ -103,10 +103,13 @@ stateDiagram-v2
 Entered on Confirm wake, or on first boot / unconfigured device (no WiFi credentials or empty `url`/`token`). Timer/other wakes in the unconfigured state go straight back to button-only sleep.
 
 - NVS namespace `kitchen`: `url` (backend base URL), `token` (bearer token). WiFi credentials are WiFiManager/ESP station credentials.
-- The screen is drawn at most twice: on entry (IP `-`) and once when the IP and update check are known.
+- The screen is drawn at most twice: on entry (IP `-`) and once when the IP and update check are known; a failed OTA install adds a third, final redraw ("Update fehlgeschlagen").
+- Idle timeout is a true 10 min: button presses, OTA attempts and any HTTP request served by the portal (`_webPortalAccessed`, read through a `WiFiManager` subclass) reset it.
+- A configured device that cannot join WiFi falls back to the `Kuechenpanel-Setup` config portal, so WiFi can be reconfigured without USB.
+- Rollback: the Arduino-ESP32 prebuilt bootloader has `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` (verified in the core's `sdkconfig.h`), so a new OTA image is pending-verify until `esp_ota_mark_app_valid_cancel_rollback()` runs, which happens right after WiFi connects on a normal wake or in maintenance. An image that crashes before that reverts to the previous one on reset.
 - Unconfigured: WiFiManager non-blocking config portal, AP `Kuechenpanel-Setup`, params "Backend URL" (default `http://home-apis:3000`) and "Token", 10 min portal timeout. On save, settings are stored and the device restarts. Idle/Confirm exit goes to button-only deep sleep (no restart, to avoid re-entering maintenance in a loop).
 - Configured: WiFi connects, `startWebPortal()` serves the same parameters at `http://<ip>/`.
-- Update check: GitHub API `releases/latest` of `githendrik/eink-kitchen-panel`; asset must be named exactly `firmware.bin`; available when `tag_name != FIRMWARE_VERSION`. Shown as "<tag> verfuegbar - Taste Hoch" (the bitmap font has no arrow/dash glyphs). TLS uses `setInsecure()` (no CA store; public data).
+- Update check: GitHub API `releases/latest` of `githendrik/eink-kitchen-panel`; asset must be named exactly `firmware.bin`; available when `tag_name != FIRMWARE_VERSION`. Shown as "Update <tag> verfügbar - Taste Hoch" (umlauts and "…" are in the font; arrows and the en dash are not, hence the plain hyphen; fits 400 px for tags like v0.10.12, see `docs/screens/maintenance_update.png`). TLS uses `setInsecure()` (no CA store; public data).
 - Buttons while awake: GPIO0 Confirm = exit (the wake press must be released first), GPIO39 Up = install update (streams into the OTA partition, then `esp_restart()`). Both debounced by polling.
 - Exit: Confirm or 10 min idle → `esp_restart()` (wake cause PowerOn; the normal wake cycle runs since settings are complete).
 - Releases: see `docs/release.md`.
