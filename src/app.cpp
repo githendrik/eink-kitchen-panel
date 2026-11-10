@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <esp_heap_caps.h>
+#include <esp_ota_ops.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -130,6 +131,7 @@ void runWakeCycle() {
     board::deepSleep(plan.sleepSeconds, false);
   }
 
+  esp_ota_mark_app_valid_cancel_rollback();
   int fetchedShift = plan.shift;
   now = k.serverTimeUtc;
   setSystemTime(now);

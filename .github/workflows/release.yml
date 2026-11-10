@@ -1,0 +1,42 @@
+name: Build and Release Firmware
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Set firmware version from tag
+        run: |
+          sed -i "s/DFIRMWARE_VERSION='\"[^\"]*\"'/DFIRMWARE_VERSION='\"${GITHUB_REF_NAME}\"'/g" platformio.ini
+          grep FIRMWARE_VERSION platformio.ini
+
+      - name: Native tests
+        run: pio test -e native
+
+      - name: Build firmware
+        run: pio run -e note4c
+
+      - name: Stage release asset
+        run: cp .pio/build/note4c/firmware.bin firmware.bin
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: firmware.bin
+          generate_release_notes: true

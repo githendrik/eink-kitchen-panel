@@ -5,7 +5,7 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 ## Layout
 
 - `src/main.cpp` – Arduino entry point; runs `runWakeCycle()` (test pattern only in `note4c-diag`).
-- `src/app.*`, `src/net.*`, `src/settings.*`, `src/maintenance.*` – wake cycle, WiFi/HTTP, NVS settings, maintenance stub.
+- `src/app.*`, `src/net.*`, `src/settings.*`, `src/maintenance.*` – wake cycle, WiFi/HTTP, NVS settings, maintenance mode; `src/ota.*` – GitHub release check and OTA install.
 - `src/board.*`, `src/epd_ssd2683.*` – power, buttons, battery, display driver.
 - `lib/core` – plain C++17, no Arduino headers; builds for `native` and `note4c`.
 - `test/` – Unity tests, run with `pio test -e native`.
@@ -71,7 +71,8 @@ stateDiagram-v2
     Wake --> ChargeMe: battery < 5 %
     ChargeMe --> Sleep0: render, sleep until charger
     Wake --> Maintenance: Confirm or no WiFi/backend settings
-    Maintenance --> Sleep0: stub (Task 8 replaces); renders only on Confirm/PowerOn, button-only wake
+    Maintenance --> Restart: Confirm, 10 min idle, settings saved, OTA done (configured)
+    Maintenance --> Sleep0: Confirm or 10 min idle while unconfigured (button-only wake)
     Wake --> Fetch: otherwise
     Fetch --> Unknown: fetch failed, time unknown
     Unknown --> Sleep15
@@ -91,10 +92,24 @@ stateDiagram-v2
 - Day: fetch `shift=0`, redraw only when `fingerprint(View)` changed (or Down pressed), sleep `planAfterDayRefresh`. If that sleep would be < 60 s, the night screen is rendered now (`shift=1`) and the panel sleeps until 06:00.
 - Night timer wake: fetch with the `planNight` shift, render night screen, sleep until 06:00. If that night sleep would be < 60 s (clock drift just before 06:00) it is treated as day: live day screen, `shift=0`, sleep until just after 06:00. Down at night: live day screen, sleep 10 min; the next timer wake in the night phase renders night again.
 - If the refetch for a different shift fails, the screen is kept (no night screen from shift-0 data). `rtcBody` holds the body that was actually rendered. Response bodies over 16 KB are rejected.
-- Unconfigured device: maintenance is rendered once on Confirm/PowerOn, then deep sleep with no timer.
+- Unconfigured device (no stored WiFi credentials or no `url`/`token`): maintenance only on Confirm/PowerOn, then deep sleep with no timer. See "Maintenance mode".
+- The first successful `/kitchen` fetch calls `esp_ota_mark_app_valid_cancel_rollback()` (rollback is enabled by `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`), so a bad OTA image reverts.
 - Stale: the last raw `/kitchen` body is kept in RTC slow memory when ≤ 4000 bytes (`rtcBody`). If a fetch fails and the last success is > 45 min old, it is re-rendered once with the stale marker; larger bodies skip this.
 - Settings: NVS namespace `kitchen`, keys `url`, `token` (`Preferences`); WiFi uses the stored station credentials via `WiFi.begin()`, 15 s timeout, WiFi off before sleep. HTTPS uses `setInsecure()` (no certificate pinning).
 - RTC state: fingerprint, last success time, stale-shown flag, last body.
+
+## Maintenance mode (`src/maintenance.cpp`, `src/ota.cpp`)
+
+Entered on Confirm wake, or on first boot / unconfigured device (no WiFi credentials or empty `url`/`token`). Timer/other wakes in the unconfigured state go straight back to button-only sleep.
+
+- NVS namespace `kitchen`: `url` (backend base URL), `token` (bearer token). WiFi credentials are WiFiManager/ESP station credentials.
+- The screen is drawn at most twice: on entry (IP `-`) and once when the IP and update check are known.
+- Unconfigured: WiFiManager non-blocking config portal, AP `Kuechenpanel-Setup`, params "Backend URL" (default `http://home-apis:3000`) and "Token", 10 min portal timeout. On save, settings are stored and the device restarts. Idle/Confirm exit goes to button-only deep sleep (no restart, to avoid re-entering maintenance in a loop).
+- Configured: WiFi connects, `startWebPortal()` serves the same parameters at `http://<ip>/`.
+- Update check: GitHub API `releases/latest` of `githendrik/eink-kitchen-panel`; asset must be named exactly `firmware.bin`; available when `tag_name != FIRMWARE_VERSION`. Shown as "<tag> verfuegbar - Taste Hoch" (the bitmap font has no arrow/dash glyphs). TLS uses `setInsecure()` (no CA store; public data).
+- Buttons while awake: GPIO0 Confirm = exit (the wake press must be released first), GPIO39 Up = install update (streams into the OTA partition, then `esp_restart()`). Both debounced by polling.
+- Exit: Confirm or 10 min idle → `esp_restart()` (wake cause PowerOn; the normal wake cycle runs since settings are complete).
+- Releases: see `docs/release.md`.
 
 ## Rendering (`lib/core`)
 
