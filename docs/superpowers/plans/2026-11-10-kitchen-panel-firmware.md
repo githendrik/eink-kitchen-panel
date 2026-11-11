@@ -1,5 +1,8 @@
 # Kitchen Panel Firmware Implementation Plan
 
+> **Historical (2026-11-10), fully executed.** Kept for traceability; current
+> behaviour is documented in `docs/architecture.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Battery-powered NOTE4C firmware that wakes every 15 min (06:00–22:00), fetches `/kitchen` from home-apis, renders layout A in black/white/red/yellow, and deep-sleeps; with night screen, maintenance mode, OTA and a low-battery screen.

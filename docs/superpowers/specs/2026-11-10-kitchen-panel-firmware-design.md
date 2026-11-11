@@ -1,5 +1,9 @@
 # Kitchen panel firmware — design
 
+> **Historical (2026-11-10).** This is the original design. The built system
+> differs in places (button mapping, tomorrow layout, off switch, rollback):
+> see `docs/status.md`, `docs/decisions.md` and `docs/architecture.md`.
+
 Date: 2026-11-10 · Status: draft for review · Companion: `home-apis/docs/superpowers/specs/2026-11-10-home-apis-design.md`
 
 ## Intent
