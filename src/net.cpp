@@ -3,13 +3,16 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <esp_wifi.h>
 
 namespace {
 constexpr int kMaxBody = 16 * 1024;
 }
 bool hasWifiCreds() {
+  // WiFi.SSID() only reports the currently connected AP; read the stored station config instead.
   WiFi.mode(WIFI_STA);
-  bool has = WiFi.SSID().length() > 0;
+  wifi_config_t conf = {};
+  bool has = esp_wifi_get_config(WIFI_IF_STA, &conf) == ESP_OK && conf.sta.ssid[0] != 0;
   WiFi.mode(WIFI_OFF);
   return has;
 }

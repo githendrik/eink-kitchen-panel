@@ -77,6 +77,8 @@ void runMaintenance() {
 
   Settings st = loadSettings();
   bool configured = settingsComplete(st) && hasWifiCreds();
+  Serial.printf("maintenance: url=%u token=%u configured=%d\n", (unsigned)st.backendUrl.length(),
+                (unsigned)st.token.length(), (int)configured);
 
   MaintInfo m;
   m.version = FIRMWARE_VERSION;
@@ -106,6 +108,7 @@ void runMaintenance() {
   bool connected = false;
   if (configured) {
     connected = wifiConnect(15000);
+    Serial.printf("maintenance: wifiConnect=%d\n", (int)connected);
     if (connected) {
       esp_ota_mark_app_valid_cancel_rollback();
       wm.startWebPortal();

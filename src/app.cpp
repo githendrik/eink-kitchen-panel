@@ -108,6 +108,8 @@ void runWakeCycle() {
   in.settingsComplete = settingsComplete(st);
   // Skip starting the radio for the credential check when the battery-critical path wins anyway.
   if (in.settingsComplete && pct >= kBatteryCriticalPct) in.settingsComplete = hasWifiCreds();
+  Serial.printf("settings: url=%u token=%u complete=%d\n", (unsigned)st.backendUrl.length(),
+                (unsigned)st.token.length(), (int)in.settingsComplete);
   in.timeKnown = now > kPlausibleUtc;
   if (in.timeKnown) in.phase = phaseAt(now, kTz);
 
