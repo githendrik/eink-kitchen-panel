@@ -86,6 +86,12 @@ int batteryMillivolts() {
 bool charging() { return gpio_get_level(PIN_CHRG) == 0; }
 bool upPressed() { return gpio_get_level(PIN_UP) == 0; }
 
+void led(bool on) {
+  gpio_hold_dis(PIN_LED);
+  gpio_set_level(PIN_LED, on ? 0 : 1);
+  gpio_hold_en(PIN_LED);
+}
+
 void deepSleep(int64_t seconds, bool wakeOnCharger) {
   gpio_hold_dis(PIN_EPD_POWER);
   gpio_set_level(PIN_EPD_POWER, 0);

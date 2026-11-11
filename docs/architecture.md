@@ -115,7 +115,7 @@ Entered on Confirm wake, or on first boot / unconfigured device (no WiFi credent
 - Unconfigured: WiFiManager non-blocking config portal, AP `Kuechenpanel-Setup`, params "Backend URL" (default `http://home-apis:3000`) and "Token", 10 min portal timeout. On save, settings are stored and the device restarts. Idle/Confirm exit goes to button-only deep sleep (no restart, to avoid re-entering maintenance in a loop).
 - Configured: WiFi connects, `startWebPortal()` serves the same parameters at `http://<ip>/`.
 - Update check: GitHub API `releases/latest` of `githendrik/eink-kitchen-panel`; asset must be named exactly `firmware.bin`; available when `tag_name != FIRMWARE_VERSION`. Shown as "Update <tag> verfügbar - Taste Hoch" (umlauts and "…" are in the font; arrows and the en dash are not, hence the plain hyphen; fits 400 px for tags like v0.10.12, see `docs/screens/maintenance_update.png`). TLS uses `setInsecure()` (no CA store; public data).
-- Buttons while awake: GPIO0 Confirm = exit (the wake press must be released first), GPIO39 Up = install update (streams into the OTA partition, then `esp_restart()`). Both debounced by polling.
+- Buttons while awake: GPIO0 Confirm = exit (the wake press must be released first), GPIO39 Up = install update (streams into the OTA partition, then `esp_restart()`; the green LED lights immediately and blinks during the download — the e-paper is too slow for feedback — and goes off if the update fails). Both debounced by polling.
 - Exit: Confirm or 10 min idle → `esp_restart()` (wake cause PowerOn; the normal wake cycle runs since settings are complete) when configured; an unconfigured device goes to button-only deep sleep instead (see above).
 - Releases: see `docs/release.md`.
 

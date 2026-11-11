@@ -5,7 +5,7 @@
 1. `pio test -e native` and `pio run -e note4c` pass locally.
 2. Tag and push: `git tag v1.2.3 && git push origin v1.2.3`.
 3. `.github/workflows/release.yml` sets `FIRMWARE_VERSION` in `platformio.ini` to the tag, runs the native tests, builds `note4c` and publishes `firmware.bin` (exact name) on the GitHub release.
-4. On the panel: press Confirm, wait for the maintenance screen to show "<tag> verfügbar - Taste Hoch", press Up to install. The panel restarts; WiFi connecting on the next wake marks the image valid, otherwise the bootloader rolls back. A broken image that does connect is not rolled back: reflash via USB (below).
+4. On the panel: press Confirm, wait for the maintenance screen to show "<tag> verfügbar - Taste Hoch", press Up to install. The green LED blinks while the update downloads (~10 s). The panel restarts; WiFi connecting on the next wake marks the image valid, otherwise the bootloader rolls back. A broken image that does connect is not rolled back: reflash via USB (below).
 
 ## Flash via USB
 

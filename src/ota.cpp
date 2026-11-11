@@ -5,6 +5,8 @@
 #include <Update.h>
 #include <WiFiClientSecure.h>
 
+#include "board.h"
+
 namespace {
 const char* const kReleaseUrl = "https://api.github.com/repos/githendrik/eink-kitchen-panel/releases/latest";
 const char* const kAssetName = "firmware.bin";
@@ -53,8 +55,26 @@ OtaInfo otaCheckForUpdate() {
   return info;
 }
 
+namespace {
+// Blinks the status LED while an update downloads (the e-paper is too slow to
+// give feedback); switches it off when the update attempt ends.
+struct UpdateLed {
+  uint32_t last = 0;
+  bool on = true;
+  UpdateLed() { board::led(true); }
+  ~UpdateLed() { board::led(false); }
+  void tick() {
+    if (millis() - last < 150) return;
+    last = millis();
+    on = !on;
+    board::led(on);
+  }
+};
+}  // namespace
+
 bool otaApplyUpdate(const OtaInfo& info) {
   if (!info.available) return false;
+  UpdateLed blink;
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
@@ -79,6 +99,7 @@ bool otaApplyUpdate(const OtaInfo& info) {
   int written = 0;
   uint32_t lastData = millis();
   while (written < len) {
+    blink.tick();
     int avail = stream->available();
     if (avail <= 0) {
       if (millis() - lastData > 30000 || !stream->connected()) break;
