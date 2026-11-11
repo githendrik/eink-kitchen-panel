@@ -31,6 +31,39 @@ static int count(const Canvas& c, Color col) {
     return n;
 }
 
+// Lowest row with black pixels left of the footer timestamp (x < 300).
+static int lowestInk(const Canvas& c) {
+    for (int y = Canvas::H - 1; y >= 0; y--)
+        for (int x = 0; x < 300; x++)
+            if (c.get(x, y) == Color::Black) return y;
+    return -1;
+}
+
+void test_tomorrow_events_stack_vertically() {
+    static uint8_t buf[Canvas::kBytes];
+    Canvas c(buf);
+    View one = dayView();
+    one.tomorrow = {{"07:00", "KiTa geschlossen"}};
+    renderDay(c, one);
+    int y1 = lowestInk(c);
+    View two = one;
+    two.tomorrow.push_back({"13:30", "Putzfrau"});
+    renderDay(c, two);
+    int y2 = lowestInk(c);
+    TEST_ASSERT_GREATER_OR_EQUAL(12, y2 - y1);  // second event on its own line
+    TEST_ASSERT_LESS_THAN(286, y2);             // stays clear of the footer
+}
+
+void test_tomorrow_overflow_stays_above_footer() {
+    static uint8_t buf[Canvas::kBytes];
+    Canvas c(buf);
+    View v = dayView();
+    v.today = {{"08:00", "a"}, {"09:00", "b"}, {"10:00", "c"}, {"11:00", "d"}, {"12:00", "e"}};
+    for (int i = 0; i < 8; i++) v.tomorrow.push_back({"09:00", "Termin"});
+    renderDay(c, v);
+    TEST_ASSERT_LESS_THAN(286, lowestInk(c));
+}
+
 void test_day_banner_yellow() {
     static uint8_t buf[Canvas::kBytes];
     Canvas c(buf);
@@ -111,5 +144,7 @@ int main() {
     RUN_TEST(test_night_panel_warning_keeps_banner);
     RUN_TEST(test_overflow);
     RUN_TEST(test_charge_me_mostly_red_text);
+    RUN_TEST(test_tomorrow_events_stack_vertically);
+    RUN_TEST(test_tomorrow_overflow_stays_above_footer);
     return UNITY_END();
 }

@@ -9,6 +9,7 @@ namespace {
 constexpr int kMargin = 12;
 constexpr int kMaxToday = 5;
 constexpr int kBannerH = 92;  // top of the calendar area (24 px warning bar + 68 px compact banner = same)
+constexpr int kCalendarBottom = 282;  // last baseline above the footer (updated time at 296)
 
 // 12x12 arrow; dir 0=right 1=left 2=up 3=down. (x, y) is the top-left.
 void arrow(Canvas& c, int x, int y, int dir, Color col) {
@@ -125,41 +126,45 @@ int drawToday(Canvas& c, const View& v, int y, int maxLines) {
     return y;
 }
 
-// Condensed tomorrow list over up to maxLines Small lines.
-void drawTomorrow(Canvas& c, const View& v, int y, int maxLines, int pitch) {
-    const int maxW = Canvas::W - 2 * kMargin;
+// Tomorrow: one event per line (Small font, time column) while lines fit above
+// `bottom` (last baseline); overflow ends with "+N weitere".
+void drawTomorrow(Canvas& c, const View& v, int y, int bottom, int pitch) {
     if (v.tomorrow.empty()) {
         drawText(c, kMargin, y, Font::Small, "keine Termine", Color::Black);
         return;
     }
-    std::string line;
-    int used = 0;
-    for (size_t i = 0; i < v.tomorrow.size(); i++) {
+    const int titleX = kMargin + 80;
+    const int titleW = Canvas::W - titleX - kMargin;
+    int fit = (bottom - y) / pitch + 1;
+    if (fit < 1) fit = 1;
+    int n = static_cast<int>(v.tomorrow.size());
+    int shown = n <= fit ? n : (fit > 1 ? fit - 1 : 1);
+    bool suffix = shown < n && shown == fit;  // no spare line: append "+N" to the last title
+    for (int i = 0; i < shown; i++) {
         const EventLine& e = v.tomorrow[i];
-        std::string item = e.time == "ganztägig" ? e.title : e.time + " " + e.title;
-        std::string cand = line.empty() ? item : line + "  ·  " + item;
-        if (!line.empty() && textWidth(Font::Small, cand.c_str()) > maxW) {
-            drawText(c, kMargin, y + used * pitch, Font::Small, line.c_str(), Color::Black, maxW);
-            used++;
-            line.clear();
-            cand = item;
-            if (used >= maxLines) return;
-        }
-        line = cand;
+        std::string title = e.title;
+        if (suffix && i == shown - 1) title += " (+" + std::to_string(n - shown) + ")";
+        drawText(c, kMargin, y, Font::Small, e.time.c_str(), Color::Black, titleX - kMargin - 6);
+        drawText(c, titleX, y, Font::Small, title.c_str(), Color::Black, titleW);
+        y += pitch;
     }
-    if (!line.empty() && used < maxLines) drawText(c, kMargin, y + used * pitch, Font::Small, line.c_str(), Color::Black, maxW);
+    if (shown < n && !suffix) {
+        char b[24];
+        snprintf(b, sizeof b, "+%d weitere", n - shown);
+        drawText(c, titleX, y, Font::Small, b, Color::Black);
+    }
 }
 
-void drawCalendar(Canvas& c, const View& v, int top, int maxToday, int tomorrowLines) {
-    int hb = top + 16;
+void drawCalendar(Canvas& c, const View& v, int top) {
+    int hb = top + 26;  // 10 px more air below the banner
     std::string head = v.todayLabel;
     if (!v.headerDate.empty()) head += " · " + v.headerDate;
     drawText(c, kMargin, hb, Font::BodyBold, head.c_str(), Color::Black);
-    int y = drawToday(c, v, hb + 20, maxToday);
-    int sep = y - 19 + 10;
+    int y = drawToday(c, v, hb + 21, kMaxToday);
+    int sep = y - 19 + 14;
     c.hline(kMargin, sep, Canvas::W - 2 * kMargin, Color::Black);
-    drawText(c, kMargin, sep + 17, Font::BodyBold, v.tomorrowLabel.c_str(), Color::Black);
-    drawTomorrow(c, v, sep + 35, tomorrowLines, 15);
+    drawText(c, kMargin, sep + 21, Font::BodyBold, v.tomorrowLabel.c_str(), Color::Black);
+    drawTomorrow(c, v, sep + 39, kCalendarBottom, 15);
 }
 }  // namespace
 
@@ -177,7 +182,7 @@ void renderDay(Canvas& c, const View& v) {
         top = 24;
     }
     drawBanner(c, v, top, v.warnPanelBattery);
-    drawCalendar(c, v, kBannerH, kMaxToday, 3);
+    drawCalendar(c, v, kBannerH);
     if (v.dataStale)
         put(c, kMargin, 296, Font::Small, "Daten veraltet · " + v.staleText, Color::Red, 250);
     int w = textWidth(Font::Small, v.updatedAt.c_str());
@@ -198,7 +203,7 @@ void renderNight(Canvas& c, const View& v) {
     int mid = top + (bh - 3) / 2;
     drawText(c, kMargin, mid + 14, Font::Huge, "Gute Nacht", Color::Black, 270);
     cat::draw(c, Canvas::W - kMargin - cat::W, mid - cat::H / 2);
-    drawCalendar(c, v, kBannerH, kMaxToday, 3);
+    drawCalendar(c, v, kBannerH);
 }
 
 void renderChargeMe(Canvas& c) {
