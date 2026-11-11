@@ -9,7 +9,9 @@ constexpr int kMaxBody = 16 * 1024;
 }
 bool hasWifiCreds() {
   WiFi.mode(WIFI_STA);
-  return WiFi.SSID().length() > 0;
+  bool has = WiFi.SSID().length() > 0;
+  WiFi.mode(WIFI_OFF);
+  return has;
 }
 
 bool wifiConnect(uint32_t timeoutMs) {

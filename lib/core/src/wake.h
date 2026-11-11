@@ -20,6 +20,22 @@ constexpr int64_t kStaleAfterSeconds = 45 * 60;
 
 WakeAction decideWake(const WakeInput& in);
 
+// server_time earlier than 2026-01-01T00:00:00Z means missing/invalid (parse yields 0).
+constexpr int64_t kMinPlausibleServerUtc = 1767225600;
+bool serverTimePlausible(int64_t utc);
+
+constexpr int64_t kChargeMeSleepSeconds = 15 * 60;
+
+struct ChargeMePlan {
+    bool draw;             // false if the ChargeMe screen is already shown
+    int64_t sleepSeconds;  // 0 = no timer
+    bool wakeOnCharger;
+};
+
+// While the charger is connected CHRG_L stays low, so a charger wake bit would re-wake at once:
+// sleep on a timer instead and re-check the battery.
+ChargeMePlan planChargeMe(bool charging, bool chargerWake, bool alreadyShown);
+
 // A day plan that would sleep under a minute: render the night screen now instead.
 bool dayPlanTooShort(const Plan& p);
 

@@ -30,6 +30,7 @@ constexpr size_t kBodyMax = 4000;
 RTC_DATA_ATTR uint32_t rtcFingerprint = 0;
 RTC_DATA_ATTR int64_t rtcLastSuccessUtc = 0;
 RTC_DATA_ATTR bool rtcStaleShown = false;
+RTC_DATA_ATTR bool rtcChargeMeShown = false;
 RTC_DATA_ATTR uint16_t rtcBodyLen = 0;
 RTC_DATA_ATTR char rtcBody[kBodyMax + 96];
 
@@ -104,14 +105,24 @@ void runWakeCycle() {
   in.batteryPct = pct;
   in.confirm = wake == board::Wake::ButtonConfirm;
   in.down = wake == board::Wake::ButtonDown;
-  in.settingsComplete = settingsComplete(st) && hasWifiCreds();
+  in.settingsComplete = settingsComplete(st);
+  // Skip starting the radio for the credential check when the battery-critical path wins anyway.
+  if (in.settingsComplete && pct >= kBatteryCriticalPct) in.settingsComplete = hasWifiCreds();
   in.timeKnown = now > kPlausibleUtc;
   if (in.timeKnown) in.phase = phaseAt(now, kTz);
 
   WakeAction action = decideWake(in);
   if (action == WakeAction::ChargeMe) {
-    drawScreen(nullptr, Screen::ChargeMe);
-    board::deepSleep(0, true);
+    ChargeMePlan cp = planChargeMe(board::charging(), wake == board::Wake::Charger, rtcChargeMeShown);
+    if (cp.draw) {
+      drawScreen(nullptr, Screen::ChargeMe);
+      rtcChargeMeShown = true;
+    }
+    board::deepSleep(cp.sleepSeconds, cp.wakeOnCharger);
+  }
+  if (rtcChargeMeShown) {
+    rtcChargeMeShown = false;
+    rtcFingerprint = 0;  // force a redraw over the ChargeMe screen
   }
   if (action == WakeAction::Maintenance) runMaintenance();
 
@@ -134,8 +145,13 @@ void runWakeCycle() {
   }
 
   int fetchedShift = plan.shift;
-  now = k.serverTimeUtc;
-  setSystemTime(now);
+  if (serverTimePlausible(k.serverTimeUtc)) {
+    now = k.serverTimeUtc;
+    setSystemTime(now);
+  } else if (!in.timeKnown) {
+    wifiOff();
+    board::deepSleep(kUnknownTimeSleep, false);
+  }
   plan = planWake(now, kTz, in.down);
 
   bool render = true;

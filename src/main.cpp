@@ -19,10 +19,14 @@ static const char* wakeName(board::Wake w) {
   }
 }
 
+extern "C" bool verifyRollbackLater() { return true; }
+
 void setup() {
   board::begin();
   Serial.begin(115200);
+#ifdef DEBUG
   delay(500);
+#endif
   Serial.printf("eink-kitchen-panel %s (core %d)\n", FIRMWARE_VERSION, core_version());
 
   int mv = board::batteryMillivolts();

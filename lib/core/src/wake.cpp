@@ -6,6 +6,13 @@ WakeAction decideWake(const WakeInput& in) {
     return WakeAction::Refresh;
 }
 
+bool serverTimePlausible(int64_t utc) { return utc >= kMinPlausibleServerUtc; }
+
+ChargeMePlan planChargeMe(bool charging, bool chargerWake, bool alreadyShown) {
+    if (charging || chargerWake) return ChargeMePlan{!alreadyShown, kChargeMeSleepSeconds, false};
+    return ChargeMePlan{!alreadyShown, 0, true};
+}
+
 bool dayPlanTooShort(const Plan& p) { return p.sleepSeconds < kMinDaySleepSeconds; }
 
 WakePlan planWake(int64_t nowUtc, const char* tz, bool downPressed) {

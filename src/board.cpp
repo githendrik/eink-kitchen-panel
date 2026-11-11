@@ -91,6 +91,16 @@ void deepSleep(int64_t seconds, bool wakeOnCharger) {
   gpio_set_level(PIN_EPD_POWER, 0);
   gpio_hold_en(PIN_EPD_POWER);
 
+  gpio_hold_dis(PIN_LED);
+  gpio_set_level(PIN_LED, 1);
+  gpio_hold_en(PIN_LED);
+  gpio_hold_dis(PIN_AUDIO_POWER);
+  gpio_set_level(PIN_AUDIO_POWER, 0);
+  gpio_hold_en(PIN_AUDIO_POWER);
+  gpio_hold_dis(PIN_AMP);
+  gpio_set_level(PIN_AMP, 0);
+  gpio_hold_en(PIN_AMP);
+
   gpio_set_level(PIN_LATCH, 1);
   gpio_hold_en(PIN_LATCH);
   gpio_deep_sleep_hold_en();

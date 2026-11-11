@@ -42,6 +42,30 @@ void test_short_day_sleep() {
 
 static const char* TZ = "CET-1CEST,M3.5.0,M10.5.0/3";
 
+void test_server_time_plausible() {
+    TEST_ASSERT_FALSE(serverTimePlausible(0));
+    TEST_ASSERT_FALSE(serverTimePlausible(1767225599));
+    TEST_ASSERT_TRUE(serverTimePlausible(1767225600));
+}
+
+void test_charge_me_plan() {
+    ChargeMePlan p = planChargeMe(false, false, false);
+    TEST_ASSERT_TRUE(p.draw);
+    TEST_ASSERT_TRUE(p.wakeOnCharger);
+    TEST_ASSERT_EQUAL_INT64(0, p.sleepSeconds);
+    p = planChargeMe(true, false, false);
+    TEST_ASSERT_TRUE(p.draw);
+    TEST_ASSERT_FALSE(p.wakeOnCharger);
+    TEST_ASSERT_EQUAL_INT64(900, p.sleepSeconds);
+    p = planChargeMe(true, true, true);
+    TEST_ASSERT_FALSE(p.draw);
+    TEST_ASSERT_FALSE(p.wakeOnCharger);
+    p = planChargeMe(false, true, true);
+    TEST_ASSERT_FALSE(p.draw);
+    TEST_ASSERT_FALSE(p.wakeOnCharger);
+    TEST_ASSERT_EQUAL_INT64(900, p.sleepSeconds);
+}
+
 static int64_t local(int y, int mo, int d, int h, int mi, int s = 0) {
     setenv("TZ", TZ, 1);
     tzset();
@@ -129,5 +153,7 @@ int main() {
     RUN_TEST(test_confirm_or_missing_settings_is_maintenance);
     RUN_TEST(test_unknown_time_fetches_as_day);
     RUN_TEST(test_short_day_sleep);
+    RUN_TEST(test_server_time_plausible);
+    RUN_TEST(test_charge_me_plan);
     return UNITY_END();
 }
