@@ -62,7 +62,8 @@ Hold the side Down button for 3 s (`kOffHoldMs`): after a ButtonDown wake, `down
 - Diag build (`note4c-diag`) flashed on device MAC `84:c7:bb:4d:be:ac` on 2026-11-10.
 - After a 120 s deep sleep on USB power the serial log showed `wake=Timer battery=4140 mV (99%) charging=0`.
 - The display sequence completed without a busy timeout.
-- Pending (needs a human at the device): colour bar and umlaut legibility, Down/Confirm button wake, battery-only latch hold.
+- 2026-11-11 (user at the device, v0.1.x): kitchen screen renders with real calendar + fake solar; Confirm wakes into maintenance, Down wakes and refreshes; OTA install via maintenance + Up works (v0.1.1 → v0.1.2 → …); hold Down 3 s on battery shows "Aus" and switches off, short Down press powers back on into the normal cycle.
+- Still open: colour/umlaut legibility judged by eye over time, long-term battery drain per day.
 
 ## Wake cycle (`src/app.cpp`)
 
