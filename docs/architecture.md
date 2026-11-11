@@ -44,6 +44,11 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 - `board::begin()` drives GPIO17 HIGH and `gpio_hold_en`s it, keeps EPD power (6), LED (3, high = off), audio power (42) and amp (46) off, and enables pull-ups on buttons and CHRG_L.
 - `deepSleep(seconds, wakeOnCharger)`: EPD power low and held, latch held through deep sleep with `gpio_deep_sleep_hold_en()` (so the board stays powered on battery), ext1 `ANY_LOW` wake on GPIO0|GPIO18 (+GPIO2 when `wakeOnCharger`), RTC pull-ups on those pins, optional timer wake (`seconds <= 0` = none).
 - Wake mapping: undefined → PowerOn, timer → Timer, ext1 mask bit 0 → ButtonConfirm, bit 18 → ButtonDown, bit 2 → Charger, else Other. Up (GPIO39) is not an RTC pin: it can only be polled while awake.
+- `powerOff()` ("Aus"/standby): waits for Down to be released, then sleeps like `deepSleep(0, false)` but drives the latch (GPIO17) LOW. On battery the board switches off completely; pressing Down/Power powers it on again (wake cause PowerOn, normal cycle). On USB the chip stays powered and sleeps with button-only wake (Down → refresh, Confirm → maintenance).
+
+### Switching off ("Aus")
+
+Hold the side Down button for 3 s (`kOffHoldMs`): after a ButtonDown wake, `downHeldFor(3000)` polls GPIO18; if it stays low, `decideWake` returns `Off` (before every other rule, including the charge screen), the "Aus – zum Einschalten seitliche Taste unten drücken" screen is drawn (`docs/screens/off.png`, no yellow/red so it never looks like live data) and `powerOff()` runs. A short press is still "refresh now". Use it before the solar system exists or for holidays: no timed wakes, no redraws.
 - Battery: ADC1_CH3, 12 dB, `esp_adc_cal` (eFuse calibration; Arduino-ESP32 2.x/IDF 4.4 has no curve-fitting scheme), ×2 divider, mean of 10 reads.
 
 ## SSD2683 driver (`src/epd_ssd2683.cpp`)

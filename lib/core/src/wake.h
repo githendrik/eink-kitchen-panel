@@ -3,12 +3,13 @@
 
 #include "schedule.h"
 
-enum class WakeAction { ChargeMe, Maintenance, Refresh };
+enum class WakeAction { ChargeMe, Maintenance, Refresh, Off };
 
 struct WakeInput {
     int batteryPct = 100;
     bool confirm = false;
     bool down = false;
+    bool downHeld = false;         // Down still held ~3 s after waking: switch off
     bool settingsComplete = true;  // WiFi credentials and backend URL/token present
     bool timeKnown = true;         // RTC holds a plausible time
     Phase phase = Phase::Day;      // only meaningful when timeKnown

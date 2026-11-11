@@ -26,6 +26,7 @@ const char* const kTz = "CET-1CEST,M3.5.0,M10.5.0/3";
 constexpr int64_t kPlausibleUtc = 1700000000;
 constexpr int64_t kUnknownTimeSleep = 15 * 60;
 constexpr size_t kBodyMax = 4000;
+constexpr uint32_t kOffHoldMs = 3000;  // hold Down this long after waking to switch off
 
 RTC_DATA_ATTR uint32_t rtcFingerprint = 0;
 RTC_DATA_ATTR int64_t rtcLastSuccessUtc = 0;
@@ -42,6 +43,7 @@ void drawScreen(const View* v, Screen s) {
   }
   Canvas c(buf);
   if (s == Screen::ChargeMe) renderChargeMe(c);
+  else if (s == Screen::Off) renderOff(c);
   else if (s == Screen::Night) renderNight(c, *v);
   else renderDay(c, *v);
   Epd().show(buf);
@@ -105,6 +107,7 @@ void runWakeCycle() {
   in.batteryPct = pct;
   in.confirm = wake == board::Wake::ButtonConfirm;
   in.down = wake == board::Wake::ButtonDown;
+  in.downHeld = in.down && board::downHeldFor(kOffHoldMs);
   in.settingsComplete = settingsComplete(st);
   // Skip starting the radio for the credential check when the battery-critical path wins anyway.
   if (in.settingsComplete && pct >= kBatteryCriticalPct) in.settingsComplete = hasWifiCreds();
@@ -114,6 +117,12 @@ void runWakeCycle() {
   if (in.timeKnown) in.phase = phaseAt(now, kTz);
 
   WakeAction action = decideWake(in);
+  if (action == WakeAction::Off) {
+    Serial.println("off: Down held, switching off");
+    drawScreen(nullptr, Screen::Off);
+    rtcFingerprint = 0;  // redraw fully when switched back on (USB case keeps RTC memory)
+    board::powerOff();
+  }
   if (action == WakeAction::ChargeMe) {
     ChargeMePlan cp = planChargeMe(board::charging(), wake == board::Wake::Charger, rtcChargeMeShown);
     if (cp.draw) {

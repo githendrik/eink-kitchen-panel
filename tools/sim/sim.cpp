@@ -123,6 +123,8 @@ static bool runScenario(const fs::path& file, const fs::path& outDir) {
         renderNight(c, buildNightView(k, now, kTz, pct));
     } else if (screen == "charge_me") {
         renderChargeMe(c);
+    } else if (screen == "off") {
+        renderOff(c);
     } else if (screen == "maintenance") {
         JsonObjectConst m = doc["maint"];
         MaintInfo mi;

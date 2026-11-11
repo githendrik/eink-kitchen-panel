@@ -215,6 +215,14 @@ void renderChargeMe(Canvas& c) {
     centered(c, 190, Font::Title, "bitte laden", Color::Red);
 }
 
+void renderOff(Canvas& c) {
+    c.fill(Color::White);
+    c.rect(6, 6, Canvas::W - 12, Canvas::H - 12, Color::Black);
+    centered(c, 130, Font::Huge, "Aus", Color::Black);
+    centered(c, 180, Font::Body, "Zum Einschalten", Color::Black);
+    centered(c, 202, Font::Body, "seitliche Taste unten drücken", Color::Black);
+}
+
 void renderMaintenance(Canvas& c, const MaintInfo& m) {
     c.fill(Color::White);
     c.fillRect(0, 0, Canvas::W, 30, Color::Black);

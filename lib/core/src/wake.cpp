@@ -1,6 +1,7 @@
 #include "wake.h"
 
 WakeAction decideWake(const WakeInput& in) {
+    if (in.downHeld) return WakeAction::Off;
     if (in.batteryPct < kBatteryCriticalPct) return WakeAction::ChargeMe;
     if (in.confirm || !in.settingsComplete) return WakeAction::Maintenance;
     return WakeAction::Refresh;

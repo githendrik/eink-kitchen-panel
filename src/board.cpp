@@ -1,5 +1,6 @@
 #include "board.h"
 
+#include <Arduino.h>
 #include <driver/gpio.h>
 #include <driver/rtc_io.h>
 #include <driver/adc.h>
@@ -92,7 +93,8 @@ void led(bool on) {
   gpio_hold_en(PIN_LED);
 }
 
-void deepSleep(int64_t seconds, bool wakeOnCharger) {
+namespace {
+[[noreturn]] void enterSleep(int64_t seconds, bool wakeOnCharger, bool keepPower) {
   gpio_hold_dis(PIN_EPD_POWER);
   gpio_set_level(PIN_EPD_POWER, 0);
   gpio_hold_en(PIN_EPD_POWER);
@@ -107,7 +109,11 @@ void deepSleep(int64_t seconds, bool wakeOnCharger) {
   gpio_set_level(PIN_AMP, 0);
   gpio_hold_en(PIN_AMP);
 
-  gpio_set_level(PIN_LATCH, 1);
+  // keepPower=false releases the power latch: on battery the board switches
+  // off completely (Down/Power powers it on again); on USB the chip stays
+  // powered and sleeps until a button wakes it.
+  gpio_hold_dis(PIN_LATCH);
+  gpio_set_level(PIN_LATCH, keepPower ? 1 : 0);
   gpio_hold_en(PIN_LATCH);
   gpio_deep_sleep_hold_en();
 
@@ -126,6 +132,26 @@ void deepSleep(int64_t seconds, bool wakeOnCharger) {
 
   if (seconds > 0) esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
   esp_deep_sleep_start();
+}
+}  // namespace
+
+bool downHeldFor(uint32_t ms) {
+  uint32_t start = millis();
+  while (millis() - start < ms) {
+    if (gpio_get_level(PIN_DOWN) != 0) return false;
+    delay(20);
+  }
+  return true;
+}
+
+void deepSleep(int64_t seconds, bool wakeOnCharger) { enterSleep(seconds, wakeOnCharger, true); }
+
+void powerOff() {
+  // Wait for the button to be released so the off press doesn't wake us again.
+  uint32_t start = millis();
+  while (gpio_get_level(PIN_DOWN) == 0 && millis() - start < 10000) delay(20);
+  delay(100);
+  enterSleep(0, false, false);
 }
 
 }  // namespace board

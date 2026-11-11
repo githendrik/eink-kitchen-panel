@@ -5,7 +5,7 @@
 
 #include "kitchen.h"
 
-enum class Screen { Day, Night, ChargeMe, Maintenance };
+enum class Screen { Day, Night, ChargeMe, Maintenance, Off };
 
 struct EventLine {
     std::string time;  // "08:00" or "ganztägig"

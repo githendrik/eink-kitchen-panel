@@ -17,4 +17,5 @@ int visibleTodayLines(const View& v);
 void renderDay(Canvas& c, const View& v);
 void renderNight(Canvas& c, const View& v);
 void renderChargeMe(Canvas& c);
+void renderOff(Canvas& c);  // standby: "Aus", how to switch back on
 void renderMaintenance(Canvas& c, const MaintInfo& m);

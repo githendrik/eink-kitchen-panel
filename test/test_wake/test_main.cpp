@@ -138,8 +138,25 @@ void test_plan_night_just_over_minimum() {
     TEST_ASSERT_TRUE(p.renderNight);
 }
 
+void test_down_held_turns_off() {
+    WakeInput in;
+    in.downHeld = true;
+    TEST_ASSERT_EQUAL(static_cast<int>(WakeAction::Off), static_cast<int>(decideWake(in)));
+    in.batteryPct = 2;  // off wins even over the charge screen
+    in.settingsComplete = false;
+    TEST_ASSERT_EQUAL(static_cast<int>(WakeAction::Off), static_cast<int>(decideWake(in)));
+}
+
+void test_short_down_is_refresh() {
+    WakeInput in;
+    in.down = true;
+    TEST_ASSERT_EQUAL(static_cast<int>(WakeAction::Refresh), static_cast<int>(decideWake(in)));
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_down_held_turns_off);
+    RUN_TEST(test_short_down_is_refresh);
     RUN_TEST(test_plan_normal_day);
     RUN_TEST(test_plan_day_close_to_22);
     RUN_TEST(test_plan_exactly_22);

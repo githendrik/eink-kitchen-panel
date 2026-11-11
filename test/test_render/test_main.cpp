@@ -64,6 +64,15 @@ void test_tomorrow_overflow_stays_above_footer() {
     TEST_ASSERT_LESS_THAN(286, lowestInk(c));
 }
 
+void test_off_screen() {
+    static uint8_t buf[Canvas::kBytes];
+    Canvas c(buf);
+    renderOff(c);
+    TEST_ASSERT_EQUAL(0, count(c, Color::Yellow));  // nothing that looks like live data
+    TEST_ASSERT_EQUAL(0, count(c, Color::Red));
+    TEST_ASSERT_GREATER_THAN(500, count(c, Color::Black));
+}
+
 void test_day_banner_yellow() {
     static uint8_t buf[Canvas::kBytes];
     Canvas c(buf);
@@ -144,6 +153,7 @@ int main() {
     RUN_TEST(test_night_panel_warning_keeps_banner);
     RUN_TEST(test_overflow);
     RUN_TEST(test_charge_me_mostly_red_text);
+    RUN_TEST(test_off_screen);
     RUN_TEST(test_tomorrow_events_stack_vertically);
     RUN_TEST(test_tomorrow_overflow_stays_above_footer);
     return UNITY_END();
