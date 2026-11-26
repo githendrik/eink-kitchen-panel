@@ -1,21 +1,21 @@
 # Status
 
-_Last updated: 2026-11-11._
+_Last updated: 2026-11-26._
 
 ## In one paragraph
 
 The panel is installed and working: firmware **v0.1.4**, fed by `home-apis`
-**v0.1.1** on the homelab. It shows today's and tomorrow's family calendar
-(real iCloud data) and a solar banner with **fake data** — the GoodWe solar
-system isn't installed yet. Until it is, the panel can be switched off by
-holding the side Down button for 3 s.
+**v0.2.0** on the homelab. It shows today's and tomorrow's family calendar
+(real iCloud data) and a solar banner with **real GoodWe data** from the SEMS+
+cloud (battery installed; PV panels still being mounted, so PV reads 0). The
+panel can be switched off by holding the side Down button for 3 s.
 
 ## Versions
 
 | Component | Version | Where |
 |---|---|---|
 | Firmware | v0.1.4 | GitHub release `firmware.bin`; installed on the device via OTA |
-| Backend | home-apis v0.1.1 | LXC CT 110 `home-apis` on host `lab`, port 3000 |
+| Backend | home-apis v0.2.0 (`solar_source: sems`) | LXC CT 110 `home-apis` on host `lab`, port 3000 |
 | Old calendar proxy | icloud-calendar-api (Deno) v0.1.0 | CT 116 `calendar-api`, still serving the desk panels |
 
 ## Verified on the device (2026-11-11)
@@ -35,10 +35,11 @@ CT 110 address), bearer token (same as the backend's `api_token`).
 ## Open items
 
 1. **Calendar cut-over (backend repo, ~2026-11-14):** compare log in CT 110 must show only the expected "Putzfrau" time difference; then move the `calendar-api` name to CT 110, stop CT 116. Desk panels then show correct times for recurring events. Steps: Obsidian homelab log `2026-11-10-home-apis-deploy`.
-2. **Real solar source:** after the GoodWe is installed. First decide network placement (see backend `docs/decisions.md`). Firmware needs no change — the `/kitchen` contract stays.
+2. **Real solar source:** decided and built in the backend — the GoodWe stays on the isolated guest WiFi and `home-apis` reads the SEMS+ cloud (`solar_source: "sems"`, home-apis v0.2.0, deployed 2026-11-26; see backend `docs/decisions.md`). Firmware needs no change — the `/kitchen` contract stays. Expect the red "home battery < 15 %" warning until the panels produce (battery sits at 10 %).
 3. **Battery thresholds:** warning < 20 %, critical < 5 % are first guesses; observe a real discharge and tune.
 4. **One unexplained false "Akku leer"** on the very first boot after USB flashing (later readings were 100 %). Not reproduced; if it recurs, re-measure before showing the charge screen.
 5. **Minor polish:** en dash missing in the font (ASCII hyphen used); `setInsecure()` for GitHub/OTA TLS; no feedback on screen when a Down-press refresh fails.
+6. **Idea (next):** a small history chart (last 1–2 h) on the panel. The backend can get per-minute PV/load/grid/SoC for the day from SEMS+; needs a `/kitchen` extension and a layout.
 
 ## Recently fixed (for context)
 
