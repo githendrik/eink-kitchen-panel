@@ -1,7 +1,9 @@
 #include <unity.h>
 
+#include <string>
 #include <vector>
 
+#include "chart.h"
 #include "render.h"
 
 void setUp() {}
@@ -37,6 +39,71 @@ static int lowestInk(const Canvas& c) {
         for (int x = 0; x < 300; x++)
             if (c.get(x, y) == Color::Black) return y;
     return -1;
+}
+
+// Chart over 06:00 + n bins of 5 min, all at pv/load watts, "now" at nowMin.
+static ChartView chart(int n, int pv, int load, int nowMin, int scaleKw = 6) {
+    ChartView c;
+    c.present = true;
+    c.pvW.assign(n, pv);
+    c.loadW.assign(n, load);
+    c.nowMin = nowMin;
+    c.scaleKw = scaleKw;
+    c.totalsText = "Erzeugt 40 kWh · Verbraucht 12 kWh";
+    c.scaleText = std::to_string(scaleKw) + " kW";
+    return c;
+}
+
+// Column whose centre time is closest to minute m (06:00-22:00 over w columns).
+static int colAt(double m, int w = 376) { return static_cast<int>((m - 360) * w / 960.0); }
+
+void test_columns_flat_value() {
+    auto cols = chartColumns(chart(120, 3000, 1000, 16 * 60), 376, 44);
+    TEST_ASSERT_EQUAL(376, (int)cols.size());
+    for (int x = 0; x < colAt(15 * 60); x++) {
+        TEST_ASSERT_TRUE(cols[x].hasData);
+        TEST_ASSERT_EQUAL(22, cols[x].pvH);
+        TEST_ASSERT_EQUAL(7, cols[x].loadH);
+    }
+}
+
+void test_columns_after_now_empty() {
+    auto cols = chartColumns(chart(192, 3000, 1000, 12 * 60), 376, 44);
+    TEST_ASSERT_TRUE(cols[colAt(11 * 60 + 50)].hasData);
+    TEST_ASSERT_FALSE(cols[colAt(12 * 60 + 10)].hasData);
+    TEST_ASSERT_FALSE(cols[375].hasData);
+}
+
+void test_columns_empty_history() {
+    auto cols = chartColumns(chart(0, 0, 0, 6 * 60 + 3, 1), 376, 44);
+    TEST_ASSERT_EQUAL(376, (int)cols.size());
+    for (const ChartColumn& c : cols) TEST_ASSERT_FALSE(c.hasData);
+}
+
+void test_columns_missing_bins_have_no_data() {
+    ChartView c = chart(60, 3000, 1000, 12 * 60);
+    for (int i = 20; i < 23; i++) c.pvW[i] = c.loadW[i] = -1;
+    auto cols = chartColumns(c, 376, 44);
+    for (int i = 20; i < 23; i++) TEST_ASSERT_FALSE(cols[colAt(360 + i * 5 + 2.5)].hasData);
+    TEST_ASSERT_TRUE(cols[colAt(360 + 19 * 5 + 2.5)].hasData);
+    TEST_ASSERT_TRUE(cols[colAt(360 + 23 * 5 + 2.5)].hasData);
+}
+
+void test_columns_interpolate() {
+    ChartView c = chart(2, 0, 0, 7 * 60, 6);
+    c.pvW = {0, 6000};
+    auto cols = chartColumns(c, 960, 60);  // 1 column per minute, centres at 06:00:30, 06:01:30, ...
+    // bin centres at 06:02:30 (0 W) and 06:07:30 (6000 W), linear in between
+    TEST_ASSERT_EQUAL(24, cols[4].pvH);  // 06:04:30 → 40 % of the way
+    TEST_ASSERT_EQUAL(36, cols[5].pvH);  // 06:05:30 → 60 %
+    TEST_ASSERT_EQUAL(0, cols[1].pvH);   // before the first centre: first bin
+    TEST_ASSERT_EQUAL(60, cols[9].pvH);  // after the last centre: last bin
+    TEST_ASSERT_FALSE(cols[10].hasData); // beyond the last bin's end
+}
+
+void test_columns_clamp_to_plot() {
+    auto cols = chartColumns(chart(12, 9000, 0, 8 * 60, 6), 376, 44);
+    TEST_ASSERT_EQUAL(44, cols[colAt(6 * 60 + 30)].pvH);
 }
 
 void test_tomorrow_events_stack_vertically() {
@@ -156,5 +223,11 @@ int main() {
     RUN_TEST(test_off_screen);
     RUN_TEST(test_tomorrow_events_stack_vertically);
     RUN_TEST(test_tomorrow_overflow_stays_above_footer);
+    RUN_TEST(test_columns_flat_value);
+    RUN_TEST(test_columns_after_now_empty);
+    RUN_TEST(test_columns_empty_history);
+    RUN_TEST(test_columns_missing_bins_have_no_data);
+    RUN_TEST(test_columns_interpolate);
+    RUN_TEST(test_columns_clamp_to_plot);
     return UNITY_END();
 }
