@@ -12,6 +12,18 @@ struct EventLine {
     std::string title;
 };
 
+// Today's production/consumption chart; present only on the day view when the
+// history is dated today.
+struct ChartView {
+    bool present = false;
+    int startMin = 360, stepMin = 5;  // bins: minutes after local midnight
+    std::vector<int> pvW, loadW;      // per bin, -1 = no data
+    int nowMin = 0;                   // minutes after local midnight
+    int scaleKw = 1;                  // larger peak, rounded up, >= 1
+    std::string totalsText;           // "Erzeugt 40 kWh · Verbraucht 12 kWh"
+    std::string scaleText;            // "6 kW"
+};
+
 struct View {
     Screen screen = Screen::Day;
     std::string headerDate;  // "Di 10. Nov"
@@ -27,6 +39,7 @@ struct View {
     std::string todayLabel, tomorrowLabel;
     std::vector<EventLine> today, tomorrow;
     std::string updatedAt;  // "06:40", excluded from fingerprint
+    ChartView chart;
 };
 
 // lastSuccessUtc == 0 means "never fetched": dataStale stays false.

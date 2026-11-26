@@ -1,5 +1,6 @@
 #include "view.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -61,6 +62,39 @@ std::vector<EventLine> lines(const Day& day) {
     return allDay;
 }
 
+// "40 kWh", or one decimal below 10 kWh ("3.2 kWh").
+std::string kwh(int wh) {
+    char b[16];
+    long tenths = std::lround(wh / 100.0);
+    if (tenths < 100)
+        snprintf(b, sizeof b, "%ld.%ld kWh", tenths / 10, tenths % 10);
+    else
+        snprintf(b, sizeof b, "%ld kWh", std::lround(wh / 1000.0));
+    return b;
+}
+
+ChartView chartView(const History& h, const tm& lt) {
+    ChartView c;
+    c.present = true;
+    c.startMin = h.startMin;
+    c.stepMin = h.stepMin;
+    c.nowMin = lt.tm_hour * 60 + lt.tm_min;
+    int peak = 0;
+    auto watts = [&](const std::vector<int16_t>& in, std::vector<int>& out) {
+        for (int16_t u : in) {
+            int w = u == kNoData ? -1 : u * h.unitW;
+            out.push_back(w);
+            if (w > peak) peak = w;
+        }
+    };
+    watts(h.pv, c.pvW);
+    watts(h.load, c.loadW);
+    c.scaleKw = peak <= 0 ? 1 : (peak + 999) / 1000;
+    c.scaleText = std::to_string(c.scaleKw) + " kW";
+    c.totalsText = "Erzeugt " + kwh(h.pvWh) + " · Verbraucht " + kwh(h.loadWh);
+    return c;
+}
+
 View build(const Kitchen& k, int64_t nowUtc, const char* tz, int panelPct, int64_t lastSuccessUtc, bool night) {
     View v;
     v.screen = night ? Screen::Night : Screen::Day;
@@ -98,6 +132,7 @@ View build(const Kitchen& k, int64_t nowUtc, const char* tz, int panelPct, int64
         v.dataStale = true;
         v.staleText = "Stand " + hhmm(lastSuccessUtc, tz);
     }
+    if (!night && k.history && k.history->date == today) v.chart = chartView(*k.history, lt);
     return v;
 }
 
@@ -149,6 +184,15 @@ uint32_t fingerprint(const View& v) {
         for (const EventLine& e : *list) {
             mix(h, e.time);
             mix(h, e.title);
+        }
+    }
+    mix(h, v.chart.present);
+    if (v.chart.present) {
+        mix(h, v.chart.totalsText);
+        mix(h, v.chart.scaleKw);
+        for (const auto* bins : {&v.chart.pvW, &v.chart.loadW}) {
+            mix(h, static_cast<long>(bins->size()));
+            for (int w : *bins) mix(h, w < 0 ? -1L : roundDiv(w, 100));
         }
     }
     return h;

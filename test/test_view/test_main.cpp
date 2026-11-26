@@ -155,6 +155,91 @@ void test_fingerprint() {
     TEST_ASSERT_NOT_EQUAL(fp(a, t1), fp(b, t1));
 }
 
+// History for 2026-11-10 with n bins at pv/load units (100 W).
+static History hist(int n, int pv, int load, int pvWh = 40460, int loadWh = 11800) {
+    History h;
+    h.date = "2026-11-10";
+    h.pv.assign(n, pv);
+    h.load.assign(n, load);
+    h.pvWh = pvWh;
+    h.loadWh = loadWh;
+    return h;
+}
+
+void test_chart_present_for_today() {
+    int64_t now = local(2026, 11, 10, 20, 30);
+    Kitchen k = base(now);
+    k.history = hist(170, 10, 4);
+    k.history->pv[80] = 55;  // 5.5 kW peak
+    k.history->load[3] = kNoData;
+    View v = buildDayView(k, now, TZ, 80, now);
+    TEST_ASSERT_TRUE(v.chart.present);
+    TEST_ASSERT_EQUAL_STRING("Erzeugt 40 kWh · Verbraucht 12 kWh", v.chart.totalsText.c_str());
+    TEST_ASSERT_EQUAL_STRING("6 kW", v.chart.scaleText.c_str());
+    TEST_ASSERT_EQUAL(6, v.chart.scaleKw);
+    TEST_ASSERT_EQUAL(20 * 60 + 30, v.chart.nowMin);
+    TEST_ASSERT_EQUAL(360, v.chart.startMin);
+    TEST_ASSERT_EQUAL(5, v.chart.stepMin);
+    TEST_ASSERT_EQUAL(170, (int)v.chart.pvW.size());
+    TEST_ASSERT_EQUAL(5500, v.chart.pvW[80]);
+    TEST_ASSERT_EQUAL(400, v.chart.loadW[0]);
+    TEST_ASSERT_EQUAL(-1, v.chart.loadW[3]);
+}
+
+void test_chart_totals_one_decimal_below_10() {
+    int64_t now = local(2026, 11, 10, 9, 0);
+    Kitchen k = base(now);
+    k.history = hist(36, 5, 4, 3240, 9960);
+    View v = buildDayView(k, now, TZ, 80, now);
+    TEST_ASSERT_EQUAL_STRING("Erzeugt 3.2 kWh · Verbraucht 10 kWh", v.chart.totalsText.c_str());
+}
+
+void test_chart_scale_uses_load_peak() {
+    int64_t now = local(2026, 11, 10, 12, 0);
+    Kitchen k = base(now);
+    k.history = hist(72, 21, 10);
+    k.history->load[5] = 34;
+    TEST_ASSERT_EQUAL_STRING("4 kW", buildDayView(k, now, TZ, 80, now).chart.scaleText.c_str());
+}
+
+void test_chart_scale_min_1() {
+    int64_t now = local(2026, 11, 10, 6, 3);
+    Kitchen k = base(now);
+    k.history = hist(0, 0, 0, 0, 0);
+    View v = buildDayView(k, now, TZ, 80, now);
+    TEST_ASSERT_TRUE(v.chart.present);
+    TEST_ASSERT_EQUAL_STRING("1 kW", v.chart.scaleText.c_str());
+    TEST_ASSERT_EQUAL_STRING("Erzeugt 0.0 kWh · Verbraucht 0.0 kWh", v.chart.totalsText.c_str());
+}
+
+void test_chart_absent_when_date_not_today() {
+    int64_t now = local(2026, 11, 11, 7, 0);
+    Kitchen k = base(now);
+    k.today.date = "2026-11-11";
+    k.history = hist(12, 1, 1);  // dated 2026-11-10
+    TEST_ASSERT_FALSE(buildDayView(k, now, TZ, 80, now).chart.present);
+}
+
+void test_chart_absent_on_night_view() {
+    int64_t now = local(2026, 11, 10, 22, 30);
+    Kitchen k = base(now);
+    k.history = hist(192, 1, 1);
+    TEST_ASSERT_FALSE(buildNightView(k, now, TZ, 80).chart.present);
+}
+
+void test_fingerprint_changes_when_chart_grows() {
+    int64_t now = local(2026, 11, 10, 12, 0);
+    Kitchen a = base(now), b = base(now), c = base(now);
+    a.history = hist(70, 10, 4);
+    b.history = hist(71, 10, 4);
+    c.history = hist(70, 10, 4);
+    c.history->pv[20] = 11;
+    uint32_t fa = fingerprint(buildDayView(a, now, TZ, 80, now));
+    TEST_ASSERT_NOT_EQUAL(fa, fingerprint(buildDayView(b, now, TZ, 80, now)));
+    TEST_ASSERT_NOT_EQUAL(fa, fingerprint(buildDayView(c, now, TZ, 80, now)));
+    TEST_ASSERT_NOT_EQUAL(fa, fingerprint(buildDayView(base(now), now, TZ, 80, now)));
+}
+
 int main() {
     (void)NOW;
     UNITY_BEGIN();
@@ -167,5 +252,12 @@ int main() {
     RUN_TEST(test_german_dates);
     RUN_TEST(test_night_labels);
     RUN_TEST(test_fingerprint);
+    RUN_TEST(test_chart_present_for_today);
+    RUN_TEST(test_chart_totals_one_decimal_below_10);
+    RUN_TEST(test_chart_scale_uses_load_peak);
+    RUN_TEST(test_chart_scale_min_1);
+    RUN_TEST(test_chart_absent_when_date_not_today);
+    RUN_TEST(test_chart_absent_on_night_view);
+    RUN_TEST(test_fingerprint_changes_when_chart_grows);
     return UNITY_END();
 }
