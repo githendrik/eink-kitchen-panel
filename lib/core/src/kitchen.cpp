@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 
 #include <cstdio>
+#include <cstring>
 
 namespace {
 int64_t daysFromCivil(int64_t y, int m, int d) {
@@ -25,6 +26,47 @@ void readDay(JsonObjectConst src, Day& out) {
         ev.allDay = e["allDay"] | false;
         out.events.push_back(std::move(ev));
     }
+}
+
+constexpr size_t kMaxHistoryBins = 192;  // 06:00-22:00 in 5-minute bins
+
+bool readBins(JsonVariantConst v, std::vector<int16_t>& out) {
+    if (!v.is<JsonArrayConst>()) return false;
+    JsonArrayConst a = v.as<JsonArrayConst>();
+    if (a.size() > kMaxHistoryBins) return false;
+    out.clear();
+    for (JsonVariantConst e : a) {
+        if (e.isNull()) {
+            out.push_back(kNoData);
+        } else if (e.is<int>() && e.as<int>() >= 0 && e.as<int>() <= 30000) {
+            out.push_back(static_cast<int16_t>(e.as<int>()));
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Malformed history is dropped (nullopt), never an error for the whole body.
+std::optional<History> readHistory(JsonVariantConst v) {
+    if (!v.is<JsonObjectConst>()) return std::nullopt;
+    JsonObjectConst o = v.as<JsonObjectConst>();
+    History h;
+    const char* date = o["date"] | "";
+    const char* start = o["start"] | "";
+    int sh, sm, n = 0;
+    if (strlen(date) != 10 || sscanf(start, "%2d:%2d%n", &sh, &sm, &n) != 2 || n != 5 || sh > 23 || sm > 59)
+        return std::nullopt;
+    h.date = date;
+    h.startMin = sh * 60 + sm;
+    h.stepMin = o["step_min"] | 0;
+    h.unitW = o["unit_w"] | 0;
+    if (h.stepMin <= 0 || h.unitW <= 0) return std::nullopt;
+    if (!readBins(o["pv"], h.pv) || !readBins(o["load"], h.load) || h.pv.size() != h.load.size())
+        return std::nullopt;
+    h.pvWh = o["pv_wh"] | 0;
+    h.loadWh = o["load_wh"] | 0;
+    return h;
 }
 }  // namespace
 
@@ -80,6 +122,7 @@ bool parseKitchen(const char* json, size_t len, Kitchen& out, std::string& err) 
         }
         k.solar = so;
     }
+    k.history = readHistory(root["history"]);
     if (!parseIsoUtc(root["server_time"] | "", k.serverTimeUtc)) k.serverTimeUtc = 0;
     out = std::move(k);
     return true;

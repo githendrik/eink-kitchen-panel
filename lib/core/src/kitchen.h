@@ -20,9 +20,19 @@ struct Solar {
     int64_t updatedAtUtc = 0;
     bool stale = false;
 };
+constexpr int16_t kNoData = -1;
+// Today's production/consumption in bins of stepMin minutes from startMin
+// (minutes after local midnight); values in units of unitW, kNoData = no data.
+struct History {
+    std::string date;  // local YYYY-MM-DD
+    int startMin = 360, stepMin = 5, unitW = 100;
+    std::vector<int16_t> pv, load;
+    int pvWh = 0, loadWh = 0;
+};
 struct Kitchen {
     Day today, tomorrow;
     std::optional<Solar> solar;
+    std::optional<History> history;
     int64_t serverTimeUtc = 0;
 };
 
