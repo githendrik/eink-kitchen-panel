@@ -81,6 +81,8 @@ void rememberBody(const String& body, int64_t now) {
     memcpy(rtcBody, body.c_str(), body.length() + 1);
     rtcBodyLen = body.length();
   } else {
+    Serial.printf("body %u > %u bytes: RTC copy skipped, no offline re-render\n", (unsigned)body.length(),
+                  (unsigned)kBodyMax);
     rtcBodyLen = 0;
   }
 }

@@ -170,7 +170,7 @@ Battery arrow: `battery_w ≥ 50` "↑", `≤ −50` "↓", otherwise none.
 - **Day screen with a chart** (`View::chart.present`; screens `day_chart_*.png`): "Morgen" is replaced by today's production/consumption chart. Today shows at most 4 lines (more than 4 events: 3 + "+N weitere"). Below the divider (at `sep`):
   - **Labels:** `totalsText` on the left and `scaleText` on the right (Small font, baseline sep + 15).
   - **Plot:** x 12–387 (376 columns = 06:00–22:00). The top is at sep + 22 and the bottom row is fixed at y 276, so the plot is 45 px tall with 4 event lines and taller with fewer.
-  - **Axis:** black baseline at y 277, 2 px ticks and hour labels `06 09 12 15 18` (Small font, baseline 289), and a dotted "now" line (06:00–22:00).
+  - **Axis:** black baseline at y 277, 1 px ticks at y 278 and hour labels `06 09 12 15 18` (Small font, baseline 287, so they end above the footer row 288), and a dotted "now" line (06:00–22:00).
   - **Columns:** `chartColumns` (`lib/core/src/chart.h`) gives per-column heights. A column has data when it lies at or before "now" and inside the bins, and its own 5-min bin has data for both series. Its value is interpolated linearly between neighbouring bin centres whenever the neighbour on that side has data.
   - **Drawing**, per data column from the bottom up: yellow up to production; red from production up to consumption when consumption is higher; a 1 px black production outline; a 2 px black consumption line. Both lines are joined vertically to the previous data column and restart after a gap.
 - Overflow: more than 5 events today → 4 events plus "+N weitere" (`visibleTodayLines` returns 4).

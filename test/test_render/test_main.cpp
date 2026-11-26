@@ -173,6 +173,15 @@ void test_render_today_capped_at_4_with_chart() {
     TEST_ASSERT_EQUAL(4, visibleTodayLines(v));  // unchanged without chart
 }
 
+// Hour labels must end above row 288, where the footer (baseline 296) starts.
+void test_render_hour_labels_clear_of_footer() {
+    Canvas c(bufA);
+    View v = chartDayView(3000, 1000);
+    v.updatedAt = "";
+    renderDay(c, v);
+    for (int x = 0; x < Canvas::W; x++) TEST_ASSERT_NOT_EQUAL(Color::Black, c.get(x, 288));
+}
+
 void test_render_chart_grows_with_fewer_events() {
     Canvas c(bufA);
     View v = chartDayView(6000, 0);  // full-scale production
@@ -310,5 +319,6 @@ int main() {
     RUN_TEST(test_render_red_where_load_exceeds_pv);
     RUN_TEST(test_render_today_capped_at_4_with_chart);
     RUN_TEST(test_render_chart_grows_with_fewer_events);
+    RUN_TEST(test_render_hour_labels_clear_of_footer);
     return UNITY_END();
 }

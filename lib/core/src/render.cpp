@@ -201,9 +201,8 @@ void drawChart(Canvas& c, const ChartView& ch, int sep) {
         snprintf(b, sizeof b, "%02d", hh);
         int lx = x0 + (hh - 6) * w / 16;
         c.pixel(lx, bottom + 2, Color::Black);
-        c.pixel(lx, bottom + 3, Color::Black);
         int tw = textWidth(Font::Small, b);
-        drawText(c, hh == 6 ? lx : lx - tw / 2, 289, Font::Small, b, Color::Black);
+        drawText(c, hh == 6 ? lx : lx - tw / 2, 287, Font::Small, b, Color::Black);
     }
 }
 
