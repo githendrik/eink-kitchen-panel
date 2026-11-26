@@ -29,6 +29,11 @@ CODES = (
 )
 
 
+# Hand-tuned advances where DejaVu's rounded advance leaves a visible gap at
+# this pixel size (e.g. "kWh" in Small).
+ADVANCE_FIX = {("Small", "W"): 10}
+
+
 def gen(name, ttf, size):
     font = ImageFont.truetype(os.path.join(TTF, ttf), size)
     ascent, descent = font.getmetrics()
@@ -39,7 +44,7 @@ def gen(name, ttf, size):
             glyphs.append((len(bitmap), 0, 0, 0, 0, 0))
             continue
         ch = chr(uni)
-        adv = int(round(font.getlength(ch)))
+        adv = ADVANCE_FIX.get((name, ch), int(round(font.getlength(ch))))
         # render 1-bit (no antialiasing) on a canvas with baseline at y=ascent
         pad = size
         img = Image.new("1", (adv + 2 * pad, ascent + descent + 2 * pad), 0)

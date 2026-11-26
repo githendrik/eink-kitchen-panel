@@ -1,0 +1,20 @@
+{
+  "screen": "day",
+  "now": "2026-11-26T07:30:00+01:00",
+  "panelBatteryPct": 80,
+  "lastSuccess": "2026-11-26T07:29:00+01:00",
+  "syntheticHistory": {"until": "07:30"},
+  "kitchen": {
+    "calendar": {
+      "today": {"label": "Heute", "date": "2026-11-26", "events": [
+        {"summary": "Fiete KiTa Waldtag", "start": "2026-11-26T08:00:00", "end": "2026-11-26T12:00:00", "allDay": false},
+        {"summary": "Zahnarzt Hendrik", "start": "2026-11-26T17:00:00", "end": "2026-11-26T18:00:00", "allDay": false}
+      ]},
+      "tomorrow": {"label": "Morgen", "date": "2026-11-27", "events": []},
+      "fetched_at": "2026-11-26T07:29:00+01:00"
+    },
+    "solar": {"pv_w": 600, "load_w": 1500, "grid_w": 0, "battery_soc": 32, "battery_w": -900,
+      "updated_at": "2026-11-26T06:29:12Z", "source": "sim", "stale": false},
+    "server_time": "2026-11-26T07:30:00+01:00"
+  }
+}

@@ -1,13 +1,16 @@
 #include "render.h"
 
+#include <algorithm>
 #include <cstdio>
 
 #include "cat_bitmap.h"
+#include "chart.h"
 #include "text.h"
 
 namespace {
 constexpr int kMargin = 12;
 constexpr int kMaxToday = 5;
+constexpr int kMaxTodayWithChart = 4;
 constexpr int kBannerH = 92;  // top of the calendar area (24 px warning bar + 68 px compact banner = same)
 constexpr int kCalendarBottom = 282;  // last baseline above the footer (updated time at 296)
 
@@ -117,7 +120,7 @@ int drawToday(Canvas& c, const View& v, int y, int maxLines) {
         drawText(c, kMargin + 106, y, Font::Body, e.title.c_str(), Color::Black, Canvas::W - kMargin - 106 - kMargin);
         y += 19;
     }
-    if (static_cast<int>(v.today.size()) > kMaxToday) {
+    if (static_cast<int>(v.today.size()) > maxLines) {
         char b[24];
         snprintf(b, sizeof b, "+%d weitere", static_cast<int>(v.today.size()) - n);
         drawText(c, kMargin + 106, y, Font::Body, b, Color::Black);
@@ -155,14 +158,67 @@ void drawTomorrow(Canvas& c, const View& v, int y, int bottom, int pitch) {
     }
 }
 
+// Production/consumption chart below the separator at y = sep (layout in
+// docs/superpowers/specs/2026-11-26-solar-history-chart-design.md).
+void drawChart(Canvas& c, const ChartView& ch, int sep) {
+    const int x0 = kMargin, w = Canvas::W - 2 * kMargin;  // 376 columns = 06:00-22:00
+    const int labelBase = sep + 15, bottom = 276, top = labelBase + 7;
+    const int plotH = bottom - top + 1;
+    drawText(c, x0, labelBase, Font::Small, ch.totalsText.c_str(), Color::Black, w - 50);
+    int sw = textWidth(Font::Small, ch.scaleText.c_str());
+    drawText(c, x0 + w - sw, labelBase, Font::Small, ch.scaleText.c_str(), Color::Black);
+
+    // Row of the top pixel for height h; h = 0 is the baseline row.
+    auto rowOf = [&](int h) { return bottom + 1 - h; };
+    std::vector<ChartColumn> cols = chartColumns(ch, w, plotH);
+    bool prev = false;
+    int prevPv = 0, prevLoad = 0;
+    for (int x = 0; x < w; x++) {
+        const ChartColumn& col = cols[x];
+        int px = x0 + x;
+        if (!col.hasData) {
+            prev = false;
+            continue;
+        }
+        if (col.pvH > 0) c.fillRect(px, rowOf(col.pvH), 1, col.pvH, Color::Yellow);
+        if (col.loadH > col.pvH) c.fillRect(px, rowOf(col.loadH), 1, col.loadH - col.pvH, Color::Red);
+        int a = rowOf(col.pvH), b = prev ? rowOf(prevPv) : a;
+        for (int y = std::min(a, b); y <= std::max(a, b); y++) c.pixel(px, y, Color::Black);
+        a = rowOf(col.loadH);
+        b = prev ? rowOf(prevLoad) : a;
+        for (int y = std::min(a, b) - 1; y <= std::max(a, b); y++) c.pixel(px, y, Color::Black);
+        prev = true;
+        prevPv = col.pvH;
+        prevLoad = col.loadH;
+    }
+    c.hline(x0, bottom + 1, w, Color::Black);
+    if (ch.nowMin >= 6 * 60 && ch.nowMin < 22 * 60) {
+        int nx = x0 + (ch.nowMin - 6 * 60) * w / (16 * 60);
+        for (int y = top; y <= bottom; y += 3) c.pixel(nx, y, Color::Black);
+    }
+    for (int hh = 6; hh <= 18; hh += 3) {
+        char b[4];
+        snprintf(b, sizeof b, "%02d", hh);
+        int lx = x0 + (hh - 6) * w / 16;
+        c.pixel(lx, bottom + 2, Color::Black);
+        c.pixel(lx, bottom + 3, Color::Black);
+        int tw = textWidth(Font::Small, b);
+        drawText(c, hh == 6 ? lx : lx - tw / 2, 289, Font::Small, b, Color::Black);
+    }
+}
+
 void drawCalendar(Canvas& c, const View& v, int top) {
     int hb = top + 26;  // 10 px more air below the banner
     std::string head = v.todayLabel;
     if (!v.headerDate.empty()) head += " · " + v.headerDate;
     drawText(c, kMargin, hb, Font::BodyBold, head.c_str(), Color::Black);
-    int y = drawToday(c, v, hb + 21, kMaxToday);
+    int y = drawToday(c, v, hb + 21, v.chart.present ? kMaxTodayWithChart : kMaxToday);
     int sep = y - 19 + 14;
     c.hline(kMargin, sep, Canvas::W - 2 * kMargin, Color::Black);
+    if (v.chart.present) {
+        drawChart(c, v.chart, sep);
+        return;
+    }
     drawText(c, kMargin, sep + 21, Font::BodyBold, v.tomorrowLabel.c_str(), Color::Black);
     drawTomorrow(c, v, sep + 39, kCalendarBottom, 15);
 }
@@ -170,7 +226,8 @@ void drawCalendar(Canvas& c, const View& v, int top) {
 
 int visibleTodayLines(const View& v) {
     int n = static_cast<int>(v.today.size());
-    return n > kMaxToday ? kMaxToday - 1 : n;
+    int max = v.chart.present ? kMaxTodayWithChart : kMaxToday;
+    return n > max ? max - 1 : n;
 }
 
 void renderDay(Canvas& c, const View& v) {

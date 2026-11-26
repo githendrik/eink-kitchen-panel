@@ -5,17 +5,18 @@ _Last updated: 2026-11-26._
 ## In one paragraph
 
 The panel is installed and working: firmware **v0.1.4**, fed by `home-apis`
-**v0.2.0** on the homelab. It shows today's and tomorrow's family calendar
+**v0.3.0** on the homelab. It shows today's and tomorrow's family calendar
 (real iCloud data) and a solar banner with **real GoodWe data** from the SEMS+
 cloud (battery installed; PV panels still being mounted, so PV reads 0). The
-panel can be switched off by holding the side Down button for 3 s.
+panel can be switched off by holding the side Down button for 3 s. Firmware
+v0.2.0 (history chart instead of "Morgen") is built and released, but not yet installed.
 
 ## Versions
 
 | Component | Version | Where |
 |---|---|---|
 | Firmware | v0.1.4 | GitHub release `firmware.bin`; installed on the device via OTA |
-| Backend | home-apis v0.2.0 (`solar_source: sems`) | LXC CT 110 `home-apis` on host `lab`, port 3000 |
+| Backend | home-apis v0.3.0 (`solar_source: sems`, `/kitchen` history) | LXC CT 110 `home-apis` on host `lab`, port 3000 |
 | Old calendar proxy | icloud-calendar-api (Deno) v0.1.0 | CT 116 `calendar-api`, still serving the desk panels |
 
 ## Verified on the device (2026-11-11)
@@ -39,7 +40,7 @@ CT 110 address), bearer token (same as the backend's `api_token`).
 3. **Battery thresholds:** warning < 20 %, critical < 5 % are first guesses; observe a real discharge and tune.
 4. **One unexplained false "Akku leer"** on the very first boot after USB flashing (later readings were 100 %). Not reproduced; if it recurs, re-measure before showing the charge screen.
 5. **Minor polish:** en dash missing in the font (ASCII hyphen used); `setInsecure()` for GitHub/OTA TLS; no feedback on screen when a Down-press refresh fails.
-6. **Idea (next):** a small history chart (last 1–2 h) on the panel. The backend can get per-minute PV/load/grid/SoC for the day from SEMS+; needs a `/kitchen` extension and a layout.
+6. **History chart (firmware v0.2.0):** today's production/consumption chart replaces "Morgen" on the day screen (`docs/screens/day_chart_*.png`). Backend side live since home-apis v0.3.0. Watch on the real panel: readability of the red areas, and whether the extra redraws cost noticeable battery.
 
 ## Recently fixed (for context)
 

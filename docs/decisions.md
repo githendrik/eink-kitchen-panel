@@ -14,6 +14,13 @@ additions at the bottom of each section.
 | Tomorrow's events one per line (not one condensed line); more padding under banner and between days | Readability after seeing the real panel | User |
 | All on-screen text German | Household language, event titles are German | User |
 | Red only for warnings: panel battery < 20 %, grid import, home battery < 15 %, stale or missing data | Red has to mean "look at this" | User (concept), agent (thresholds) |
+| **Extended 2026-11-26:** red also fills the chart wherever consumption is higher than production (layout A3) | Shows at a glance when the house uses more than it makes; accepted that it appears every morning and evening | User |
+| Day screen: today's production/consumption chart replaces "Morgen" | The owner wants a feel for the day's production; tomorrow is on the night screen and other panels | User |
+| Chart: 06:00–22:00 fixed axis, yellow production area, 2 px black consumption line, totals + kW scale above | Chosen from mockups and a pixel-exact spike | User (A3), agent (details) |
+| With a chart, today shows at most 4 lines; with fewer events the plot grows taller | The chart never shrinks below ~45 px | Agent |
+| Chart scale = larger of the production and consumption peaks, whole kW | A consumption spike must not be cut off | Agent |
+| No extra redraw throttling for the chart | The day screen already redraws on most daytime wakes (PV/load change) | Agent |
+| Small-font `W` advance trimmed to 10 px (`ADVANCE_FIX`) | "kWh" had a visible gap | Agent |
 | Dropped "imminent event" red highlight from the mockup | Would need time-based wakes/redraws, costs battery | Agent |
 
 ## Power and schedule

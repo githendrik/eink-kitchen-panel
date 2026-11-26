@@ -106,6 +106,82 @@ void test_columns_clamp_to_plot() {
     TEST_ASSERT_EQUAL(44, cols[colAt(6 * 60 + 30)].pvH);
 }
 
+static uint32_t canvasHash(const Canvas& c) {
+    uint32_t h = 2166136261u;
+    for (int i = 0; i < Canvas::kBytes; i++) {
+        h ^= c.data()[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static uint8_t bufA[Canvas::kBytes];
+
+// Recorded from renderDay before the chart existed (v0.1.4 layout).
+void test_render_without_chart_unchanged() {
+    Canvas c(bufA);
+    View v = dayView();
+    v.today = {{"08:00", "Fiete KiTa"}, {"12:30", "Mittagessen mit Oma"}, {"17:00", "Zahnarzt"}};
+    v.tomorrow = {{"ganztägig", "Müllabfuhr"}, {"09:00", "Yoga"}};
+    renderDay(c, v);
+    TEST_ASSERT_EQUAL_HEX32(0xDD9D8D0Eu, canvasHash(c));
+}
+
+// Day view with 4 events today, tomorrow entries and a chart at 20:30.
+static View chartDayView(int pv, int load) {
+    View v = dayView();
+    v.today = {{"08:00", "A"}, {"12:30", "B"}, {"17:00", "C"}, {"19:30", "D"}};
+    v.tomorrow = {{"09:00", "Yoga"}};
+    v.chart = chart(170, pv, load, 20 * 60 + 30);
+    return v;
+}
+
+static int countBelow(const Canvas& c, Color col, int y0) {
+    int n = 0;
+    for (int y = y0; y < Canvas::H; y++)
+        for (int x = 0; x < Canvas::W; x++)
+            if (c.get(x, y) == col) n++;
+    return n;
+}
+
+void test_render_chart_replaces_tomorrow() {
+    Canvas c(bufA);
+    View v = chartDayView(3000, 1000);
+    renderDay(c, v);
+    TEST_ASSERT_EQUAL(Color::Black, c.get(12, 277));   // baseline
+    TEST_ASSERT_EQUAL(Color::Yellow, c.get(100, 270)); // production fill
+    TEST_ASSERT_EQUAL(0, countBelow(c, Color::Red, 200));
+    v.chart.present = false;
+    renderDay(c, v);
+    TEST_ASSERT_EQUAL(0, countBelow(c, Color::Yellow, 200));
+}
+
+void test_render_red_where_load_exceeds_pv() {
+    Canvas c(bufA);
+    renderDay(c, chartDayView(1000, 3000));
+    TEST_ASSERT_TRUE(countBelow(c, Color::Red, 200) > 100);
+}
+
+void test_render_today_capped_at_4_with_chart() {
+    View v = chartDayView(3000, 1000);
+    v.today = {{"1", "a"}, {"2", "b"}, {"3", "c"}, {"4", "d"}, {"5", "e"}, {"6", "f"}};
+    TEST_ASSERT_EQUAL(3, visibleTodayLines(v));
+    v.today.resize(4);
+    TEST_ASSERT_EQUAL(4, visibleTodayLines(v));
+    v.chart.present = false;
+    v.today.resize(6);
+    TEST_ASSERT_EQUAL(4, visibleTodayLines(v));  // unchanged without chart
+}
+
+void test_render_chart_grows_with_fewer_events() {
+    Canvas c(bufA);
+    View v = chartDayView(6000, 0);  // full-scale production
+    v.today.resize(1);
+    renderDay(c, v);
+    // with one event the separator sits at 153, so the plot reaches well above y 232
+    TEST_ASSERT_EQUAL(Color::Yellow, c.get(100, 190));
+}
+
 void test_tomorrow_events_stack_vertically() {
     static uint8_t buf[Canvas::kBytes];
     Canvas c(buf);
@@ -229,5 +305,10 @@ int main() {
     RUN_TEST(test_columns_missing_bins_have_no_data);
     RUN_TEST(test_columns_interpolate);
     RUN_TEST(test_columns_clamp_to_plot);
+    RUN_TEST(test_render_without_chart_unchanged);
+    RUN_TEST(test_render_chart_replaces_tomorrow);
+    RUN_TEST(test_render_red_where_load_exceeds_pv);
+    RUN_TEST(test_render_today_capped_at_4_with_chart);
+    RUN_TEST(test_render_chart_grows_with_fewer_events);
     return UNITY_END();
 }

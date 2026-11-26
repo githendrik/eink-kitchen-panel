@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -91,6 +92,49 @@ static int64_t isoOr(JsonVariantConst v, int64_t def) {
     return v.is<const char*>() && parseIsoUtc(v.as<const char*>(), t) ? t : def;
 }
 
+// Synthetic day for "syntheticHistory": sunny with cloud dips at 11:30 and
+// 14:00, cooking at 11:36 and 18:36 (kW at local hour h).
+static double synPv(double h) {
+    if (h < 6.8 || h > 19.2) return 0;
+    double v = 5.5 * std::sin(M_PI * (h - 6.8) / (19.2 - 6.8));
+    v *= 1 - 0.6 * std::exp(-std::pow((h - 11.5) / 0.35, 2)) - 0.45 * std::exp(-std::pow((h - 14.0) / 0.25, 2));
+    return std::max(v, 0.0);
+}
+static double synBump(double h, double c, double a, double s) { return a * std::exp(-std::pow((h - c) / s, 2)); }
+static double synLoad(double h) {
+    return 0.4 + synBump(h, 7.1, 1.6, 0.35) + synBump(h, 11.6, 2.6, 0.3) + synBump(h, 9.5, 0.9, 0.5) +
+           synBump(h, 18.6, 2.2, 0.6) + synBump(h, 20.0, 0.6, 0.5);
+}
+
+// Writes a /kitchen "history" for `date` with complete 5-min bins up to "HH:MM".
+static void syntheticHistory(JsonObject kitchen, const std::string& date, const char* until) {
+    int uh = 0, um = 0;
+    sscanf(until, "%d:%d", &uh, &um);
+    int end = uh * 60 + um;
+    JsonObject h = kitchen["history"].to<JsonObject>();
+    h["date"] = date;
+    h["start"] = "06:00";
+    h["step_min"] = 5;
+    h["unit_w"] = 100;
+    JsonArray pv = h["pv"].to<JsonArray>(), load = h["load"].to<JsonArray>();
+    for (int b = 360; b + 5 <= end && b < 22 * 60; b += 5) {
+        double sp = 0, sl = 0;
+        for (int m = b; m < b + 5; m++) {
+            sp += synPv(m / 60.0);
+            sl += synLoad(m / 60.0);
+        }
+        pv.add(static_cast<int>(std::lround(sp / 5 * 10)));  // kW mean → 100 W units
+        load.add(static_cast<int>(std::lround(sl / 5 * 10)));
+    }
+    double ep = 0, el = 0;
+    for (int m = 0; m < end; m++) {
+        ep += synPv(m / 60.0) * 1000 / 60;
+        el += synLoad(m / 60.0) * 1000 / 60;
+    }
+    h["pv_wh"] = static_cast<int>(std::lround(ep));
+    h["load_wh"] = static_cast<int>(std::lround(el));
+}
+
 static bool runScenario(const fs::path& file, const fs::path& outDir) {
     std::ifstream in(file);
     std::stringstream ss;
@@ -108,6 +152,9 @@ static bool runScenario(const fs::path& file, const fs::path& outDir) {
 
     Kitchen k;
     std::string kjson, err;
+    if (doc["syntheticHistory"].is<JsonObject>())
+        syntheticHistory(doc["kitchen"].as<JsonObject>(), doc["kitchen"]["calendar"]["today"]["date"] | "",
+                         doc["syntheticHistory"]["until"] | "12:00");
     serializeJson(doc["kitchen"], kjson);
     if (screen == "day" || screen == "night") {
         if (!parseKitchen(kjson.data(), kjson.size(), k, err)) {
