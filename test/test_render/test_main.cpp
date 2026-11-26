@@ -148,8 +148,8 @@ void test_render_chart_replaces_tomorrow() {
     Canvas c(bufA);
     View v = chartDayView(3000, 1000);
     renderDay(c, v);
-    TEST_ASSERT_EQUAL(Color::Black, c.get(12, 277));   // baseline
-    TEST_ASSERT_EQUAL(Color::Yellow, c.get(100, 270)); // production fill
+    TEST_ASSERT_EQUAL(Color::Black, c.get(12, 272));   // baseline
+    TEST_ASSERT_EQUAL(Color::Yellow, c.get(100, 265)); // production fill
     TEST_ASSERT_EQUAL(0, countBelow(c, Color::Red, 200));
     v.chart.present = false;
     renderDay(c, v);
@@ -174,21 +174,54 @@ void test_render_today_capped_at_4_with_chart() {
 }
 
 // With a chart the divider is 3 px thick (rows 210-212 with 4 events).
-void test_render_chart_divider_thick() {
+// No divider with a chart: the chart starts 7 px below the last event
+// (4 events: last baseline 196, plot top 203).
+void test_render_chart_no_divider() {
     Canvas c(bufA);
-    renderDay(c, chartDayView(3000, 1000));
-    for (int y = 210; y <= 212; y++) TEST_ASSERT_EQUAL(Color::Black, c.get(200, y));
-    TEST_ASSERT_EQUAL(Color::White, c.get(200, 213));
-    TEST_ASSERT_EQUAL(Color::White, c.get(200, 209));
+    renderDay(c, chartDayView(6000, 0));  // full-scale production reaches the plot top
+    for (int y = 200; y <= 202; y++)
+        for (int x = 0; x < Canvas::W; x++) TEST_ASSERT_EQUAL(Color::White, c.get(x, y));
+    TEST_ASSERT_EQUAL(Color::Black, c.get(200, 203));  // production outline at the top
 }
 
-// Hour labels must end above row 288, where the footer (baseline 296) starts.
+// Chart runs edge to edge like the banner.
+void test_render_chart_full_width() {
+    Canvas c(bufA);
+    renderDay(c, chartDayView(3000, 1000));
+    TEST_ASSERT_EQUAL(Color::Yellow, c.get(1, 265));
+    TEST_ASSERT_EQUAL(Color::Black, c.get(0, 272));
+    TEST_ASSERT_EQUAL(Color::Black, c.get(399, 272));
+}
+
+// Hour labels end at row 281; rows 282-286 stay clear above the footer text
+// (its tallest glyphs start at row 287).
 void test_render_hour_labels_clear_of_footer() {
     Canvas c(bufA);
+    renderDay(c, chartDayView(3000, 1000));
+    for (int y = 282; y <= 286; y++)
+        for (int x = 0; x < Canvas::W; x++) TEST_ASSERT_EQUAL(Color::White, c.get(x, y));
+}
+
+static int countIn(const Canvas& c, Color col, int x0, int x1, int y0, int y1) {
+    int n = 0;
+    for (int y = y0; y <= y1; y++)
+        for (int x = x0; x <= x1; x++)
+            if (c.get(x, y) == col) n++;
+    return n;
+}
+
+// Footer: totals bottom left (black), scale + time bottom right; stale text
+// (red) replaces the totals.
+void test_render_chart_footer() {
+    Canvas c(bufA);
     View v = chartDayView(3000, 1000);
-    v.updatedAt = "";
     renderDay(c, v);
-    for (int x = 0; x < Canvas::W; x++) TEST_ASSERT_NOT_EQUAL(Color::Black, c.get(x, 288));
+    TEST_ASSERT_TRUE(countIn(c, Color::Black, 0, 150, 288, 299) > 50);
+    TEST_ASSERT_TRUE(countIn(c, Color::Black, 300, 399, 288, 299) > 30);
+    v.dataStale = true;
+    v.staleText = "Stand 07:15";
+    renderDay(c, v);
+    TEST_ASSERT_TRUE(countIn(c, Color::Red, 0, 200, 288, 299) > 50);
 }
 
 void test_render_chart_grows_with_fewer_events() {
@@ -329,6 +362,8 @@ int main() {
     RUN_TEST(test_render_today_capped_at_4_with_chart);
     RUN_TEST(test_render_chart_grows_with_fewer_events);
     RUN_TEST(test_render_hour_labels_clear_of_footer);
-    RUN_TEST(test_render_chart_divider_thick);
+    RUN_TEST(test_render_chart_no_divider);
+    RUN_TEST(test_render_chart_full_width);
+    RUN_TEST(test_render_chart_footer);
     return UNITY_END();
 }

@@ -158,15 +158,12 @@ void drawTomorrow(Canvas& c, const View& v, int y, int bottom, int pitch) {
     }
 }
 
-// Production/consumption chart below the separator at y = sep (layout in
-// docs/superpowers/specs/2026-11-26-solar-history-chart-design.md).
-void drawChart(Canvas& c, const ChartView& ch, int sep) {
-    const int x0 = kMargin, w = Canvas::W - 2 * kMargin;  // 376 columns = 06:00-22:00
-    const int labelBase = sep + 15, bottom = 276, top = labelBase + 7;
+// Production/consumption chart, edge to edge, from plotTop down to the baseline
+// at y 272 with hour labels below (layout in docs/architecture.md).
+void drawChart(Canvas& c, const ChartView& ch, int plotTop) {
+    const int x0 = 0, w = Canvas::W;  // 400 columns = 06:00-22:00
+    const int bottom = 271, top = plotTop;
     const int plotH = bottom - top + 1;
-    drawText(c, x0, labelBase, Font::Small, ch.totalsText.c_str(), Color::Black, w - 50);
-    int sw = textWidth(Font::Small, ch.scaleText.c_str());
-    drawText(c, x0 + w - sw, labelBase, Font::Small, ch.scaleText.c_str(), Color::Black);
 
     // Row of the top pixel for height h; h = 0 is the baseline row.
     auto rowOf = [&](int h) { return bottom + 1 - h; };
@@ -186,7 +183,7 @@ void drawChart(Canvas& c, const ChartView& ch, int sep) {
         for (int y = std::min(a, b); y <= std::max(a, b); y++) c.pixel(px, y, Color::Black);
         a = rowOf(col.loadH);
         b = prev ? rowOf(prevLoad) : a;
-        for (int y = std::min(a, b) - 1; y <= std::max(a, b); y++) c.pixel(px, y, Color::Black);
+        for (int y = std::max(top, std::min(a, b) - 1); y <= std::max(a, b); y++) c.pixel(px, y, Color::Black);
         prev = true;
         prevPv = col.pvH;
         prevLoad = col.loadH;
@@ -202,8 +199,21 @@ void drawChart(Canvas& c, const ChartView& ch, int sep) {
         int lx = x0 + (hh - 6) * w / 16;
         c.pixel(lx, bottom + 2, Color::Black);
         int tw = textWidth(Font::Small, b);
-        drawText(c, hh == 6 ? lx : lx - tw / 2, 287, Font::Small, b, Color::Black);
+        drawText(c, hh == 6 ? lx + 1 : lx - tw / 2, 282, Font::Small, b, Color::Black);
     }
+}
+
+// Footer under the chart: totals left (or the red stale note), scale and
+// update time right.
+void drawChartFooter(Canvas& c, const View& v) {
+    std::string right = v.chart.scaleText + " · " + v.updatedAt;
+    int rw = textWidth(Font::Small, right.c_str());
+    int maxLeft = Canvas::W - 2 * kMargin - rw - 8;
+    if (v.dataStale)
+        put(c, kMargin, 296, Font::Small, "Daten veraltet · " + v.staleText, Color::Red, maxLeft);
+    else
+        put(c, kMargin, 296, Font::Small, v.chart.totalsText, Color::Black, maxLeft);
+    drawText(c, Canvas::W - kMargin - rw, 296, Font::Small, right.c_str(), v.dataStale ? Color::Red : Color::Black);
 }
 
 void drawCalendar(Canvas& c, const View& v, int top) {
@@ -212,12 +222,11 @@ void drawCalendar(Canvas& c, const View& v, int top) {
     if (!v.headerDate.empty()) head += " · " + v.headerDate;
     drawText(c, kMargin, hb, Font::BodyBold, head.c_str(), Color::Black);
     int y = drawToday(c, v, hb + 21, v.chart.present ? kMaxTodayWithChart : kMaxToday);
-    int sep = y - 19 + 14;
     if (v.chart.present) {
-        c.fillRect(kMargin, sep, Canvas::W - 2 * kMargin, 3, Color::Black);  // thick divider above the chart
-        drawChart(c, v.chart, sep);
+        drawChart(c, v.chart, y - 19 + 7);  // 7 px below the last event's baseline, no divider
         return;
     }
+    int sep = y - 19 + 14;
     c.hline(kMargin, sep, Canvas::W - 2 * kMargin, Color::Black);
     drawText(c, kMargin, sep + 21, Font::BodyBold, v.tomorrowLabel.c_str(), Color::Black);
     drawTomorrow(c, v, sep + 39, kCalendarBottom, 15);
@@ -240,6 +249,10 @@ void renderDay(Canvas& c, const View& v) {
     }
     drawBanner(c, v, top, v.warnPanelBattery);
     drawCalendar(c, v, kBannerH);
+    if (v.chart.present) {
+        drawChartFooter(c, v);
+        return;
+    }
     if (v.dataStale)
         put(c, kMargin, 296, Font::Small, "Daten veraltet · " + v.staleText, Color::Red, 250);
     int w = textWidth(Font::Small, v.updatedAt.c_str());

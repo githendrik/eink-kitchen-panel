@@ -17,6 +17,7 @@ additions at the bottom of each section.
 | **Extended 2026-11-26:** red also fills the chart wherever consumption is higher than production (layout A3) | Shows at a glance when the house uses more than it makes; accepted that it appears every morning and evening | User |
 | Day screen: today's production/consumption chart replaces "Morgen" | The owner wants a feel for the day's production; tomorrow is on the night screen and other panels | User |
 | Chart: 06:00–22:00 fixed axis, yellow production area, 2 px black consumption line, totals + kW scale above | Chosen from mockups and a pixel-exact spike | User (A3), agent (details) |
+| **Revised 2026-11-26 (v0.2.2):** no divider, the chart runs edge to edge directly below the calendar, and the totals, scale and update time sit in one footer line | Seamless look like the banner; more room for the chart and the bottom text | User |
 | With a chart, today shows at most 4 lines; with fewer events the plot grows taller | The chart never shrinks below ~45 px | Agent |
 | Chart scale = larger of the production and consumption peaks, whole kW | A consumption spike must not be cut off | Agent |
 | No extra redraw throttling for the chart | The day screen already redraws on most daytime wakes (PV/load change) | Agent |
