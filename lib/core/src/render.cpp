@@ -213,11 +213,12 @@ void drawCalendar(Canvas& c, const View& v, int top) {
     drawText(c, kMargin, hb, Font::BodyBold, head.c_str(), Color::Black);
     int y = drawToday(c, v, hb + 21, v.chart.present ? kMaxTodayWithChart : kMaxToday);
     int sep = y - 19 + 14;
-    c.hline(kMargin, sep, Canvas::W - 2 * kMargin, Color::Black);
     if (v.chart.present) {
+        c.fillRect(kMargin, sep, Canvas::W - 2 * kMargin, 3, Color::Black);  // thick divider above the chart
         drawChart(c, v.chart, sep);
         return;
     }
+    c.hline(kMargin, sep, Canvas::W - 2 * kMargin, Color::Black);
     drawText(c, kMargin, sep + 21, Font::BodyBold, v.tomorrowLabel.c_str(), Color::Black);
     drawTomorrow(c, v, sep + 39, kCalendarBottom, 15);
 }

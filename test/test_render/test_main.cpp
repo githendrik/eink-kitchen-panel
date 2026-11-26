@@ -173,6 +173,15 @@ void test_render_today_capped_at_4_with_chart() {
     TEST_ASSERT_EQUAL(4, visibleTodayLines(v));  // unchanged without chart
 }
 
+// With a chart the divider is 3 px thick (rows 210-212 with 4 events).
+void test_render_chart_divider_thick() {
+    Canvas c(bufA);
+    renderDay(c, chartDayView(3000, 1000));
+    for (int y = 210; y <= 212; y++) TEST_ASSERT_EQUAL(Color::Black, c.get(200, y));
+    TEST_ASSERT_EQUAL(Color::White, c.get(200, 213));
+    TEST_ASSERT_EQUAL(Color::White, c.get(200, 209));
+}
+
 // Hour labels must end above row 288, where the footer (baseline 296) starts.
 void test_render_hour_labels_clear_of_footer() {
     Canvas c(bufA);
@@ -320,5 +329,6 @@ int main() {
     RUN_TEST(test_render_today_capped_at_4_with_chart);
     RUN_TEST(test_render_chart_grows_with_fewer_events);
     RUN_TEST(test_render_hour_labels_clear_of_footer);
+    RUN_TEST(test_render_chart_divider_thick);
     return UNITY_END();
 }
