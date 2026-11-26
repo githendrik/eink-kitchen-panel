@@ -191,7 +191,7 @@ void drawChart(Canvas& c, const ChartView& ch, int plotTop) {
     c.hline(x0, bottom + 1, w, Color::Black);
     if (ch.nowMin >= 6 * 60 && ch.nowMin < 22 * 60) {
         int nx = x0 + (ch.nowMin - 6 * 60) * w / (16 * 60);
-        for (int y = top; y <= bottom; y += 3) c.pixel(nx, y, Color::Black);
+        for (int y = top + plotH / 5; y <= bottom; y += 3) c.pixel(nx, y, Color::Black);  // lower 80 %
     }
     for (int hh = 6; hh <= 18; hh += 3) {
         char b[4];

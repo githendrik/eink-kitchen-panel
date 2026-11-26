@@ -193,6 +193,17 @@ void test_render_chart_full_width() {
     TEST_ASSERT_EQUAL(Color::Black, c.get(399, 272));
 }
 
+// "Now" line covers only the lower ~80 % of the plot (4 events: top 203,
+// 69 px tall, 69 / 5 = 13 → dots start at 216).
+void test_render_now_line_lower_80_percent() {
+    Canvas c(bufA);
+    renderDay(c, chartDayView(0, 0));  // 20:30 → column 362
+    for (int y = 203; y <= 215; y++) TEST_ASSERT_EQUAL_MESSAGE(Color::White, c.get(362, y), std::to_string(y).c_str());
+    int dots = 0;
+    for (int y = 216; y <= 271; y++) dots += c.get(362, y) == Color::Black;
+    TEST_ASSERT_TRUE(dots >= 15);
+}
+
 // Hour labels end at row 281; rows 282-286 stay clear above the footer text
 // (its tallest glyphs start at row 287).
 void test_render_hour_labels_clear_of_footer() {
@@ -365,5 +376,6 @@ int main() {
     RUN_TEST(test_render_chart_no_divider);
     RUN_TEST(test_render_chart_full_width);
     RUN_TEST(test_render_chart_footer);
+    RUN_TEST(test_render_now_line_lower_80_percent);
     return UNITY_END();
 }
