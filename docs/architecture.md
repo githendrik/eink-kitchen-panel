@@ -10,6 +10,25 @@ Firmware for the ZECTRIX NOTE4C (ESP32-S3 N16R8, 400×300 4-colour e-paper) kitc
 - `lib/core` – plain C++17, no Arduino headers; builds for `native` and `note4c`.
 - `test/` – Unity tests, run with `pio test -e native`.
 
+## Solar data and the history chart, end to end
+
+1. The **GoodWe inverter** sits on the isolated guest WiFi and reports to the GoodWe SEMS+ cloud. Nothing on the LAN talks to it directly.
+2. **`home-apis`** on CT 110 reads the SEMS+ cloud with a read-only visitor account:
+   - the live power flow every 5 min, which becomes the `solar` snapshot;
+   - the per-minute day curve at most every 5 min, binned into `history`: 5-minute bins from 06:00 in 100 W units, plus Wh totals.
+
+   It serves both in compact `GET /kitchen`. `history` is sent only for `shift=0` and only when dated today. Details are in `home-apis/docs/architecture.md`.
+3. **The panel** wakes every 15 min and fetches `/kitchen`. Then:
+   - `parseKitchen` turns the optional `history` into `History`, and drops it if it's malformed.
+   - `buildDayView` turns that into `View::chart` (`ChartView`) when its date is today.
+   - `chartColumns` computes per-pixel-column heights.
+   - `renderDay` draws the chart in place of "Morgen", with the footer below.
+
+   The fingerprint includes the bins, so a growing chart triggers a redraw. Without `history`, the day screen is the classic one with "Morgen".
+4. **Preview and tests:**
+   - the `syntheticHistory` simulator scenarios (`docs/screens/day_chart_*.png`);
+   - `test_data` for parsing, `test_view` for `ChartView`, and `test_render` for column math and layout pixels.
+
 ## Pins
 
 | Function | GPIO |
@@ -166,7 +185,7 @@ Battery arrow: `battery_w ≥ 50` "↑", `≤ −50` "↓", otherwise none.
 
 ## Screens (`lib/core/src/render.h`)
 
-- `renderDay`: yellow solar banner (92 px, 3 px black bottom border): "Solar", Huge kW number, house/grid/battery (arrows drawn as shapes, since the fonts lack "→←↑↓") and a SoC bar. Below (10 px gap): today header, up to 5 event lines (Body, 19 px pitch), a divider with 14 px air above and below, then tomorrow one event per line (Small, 15 px pitch, time column + title) as far as space allows above the footer (last baseline 282); overflow ends with "+N weitere", or "(+N)" appended to the only line when just one fits. Update time bottom-right. With `warnPanelBattery` a 24 px red bar ("Panel-Akku schwach - bitte laden", ASCII hyphen because the font lacks an en dash) sits on top and the banner shrinks to 68 px. Red text: grid import, home battery < 15 %, stale solar "Stand", stale data footer. Missing solar shows "keine Daten" in the banner.
+- `renderDay` (classic, without a chart): yellow solar banner (92 px, 3 px black bottom border): "Solar", Huge kW number, house/grid/battery (arrows drawn as shapes, since the fonts lack "→←↑↓") and a SoC bar. Below (10 px gap): today header, up to 5 event lines (Body, 19 px pitch), a divider with 14 px air above and below, then tomorrow one event per line (Small, 15 px pitch, time column + title) as far as space allows above the footer (last baseline 282); overflow ends with "+N weitere", or "(+N)" appended to the only line when just one fits. Update time bottom-right. With `warnPanelBattery` a 24 px red bar ("Panel-Akku schwach - bitte laden", ASCII hyphen because the font lacks an en dash) sits on top and the banner shrinks to 68 px. Red text: grid import, home battery < 15 %, stale solar "Stand", stale data footer. Missing solar shows "keine Daten" in the banner.
 - **Day screen with a chart** (`View::chart.present`; screens `day_chart_*.png`): "Morgen" is replaced by today's production/consumption chart. Today shows at most 4 lines (more than 4 events: 3 + "+N weitere"). There is **no divider**: the chart follows the calendar directly.
   - **Plot:** edge to edge, x 0–399 (400 columns = 06:00–22:00), like the banner. The top is 7 px below the last event's baseline (y 203 with 4 events) and the bottom row is fixed at y 271, so the plot is 69 px tall with 4 event lines and taller with fewer.
   - **Axis:** black baseline at y 272, 1 px ticks at y 273 and hour labels `06 09 12 15 18` (Small font, baseline 282), and a dotted "now" line over the lower 80 % of the plot (06:00–22:00).

@@ -1,5 +1,7 @@
 # Solar History Chart Implementation Plan
 
+> **Historical: executed 2026-11-26** (all 9 tasks done; home-apis v0.3.0, firmware v0.2.0, later layout tweaks up to v0.2.3). Deviations decided during the build are recorded in both repos' `docs/decisions.md`; current behaviour is in `docs/architecture.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Show today's production/consumption curve (layout A3) on the kitchen panel's day screen, fed by a new `history` field in `home-apis` `/kitchen`.

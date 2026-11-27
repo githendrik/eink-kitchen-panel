@@ -1,5 +1,12 @@
 # Solar history chart on the kitchen panel — design
 
+> **Historical (implemented 2026-11-26, firmware v0.2.0 / home-apis v0.3.0).**
+> The layout was revised after implementation. v0.2.2 removed the divider,
+> made the chart edge to edge and moved the totals, scale and time into the
+> footer; v0.2.3 shortened the "now" line. `docs/architecture.md` (this repo)
+> and `home-apis/docs/architecture.md` describe the current behaviour and win
+> where they differ.
+
 _2026-11-26. Spans `eink-kitchen-panel` (firmware) and `home-apis` (backend)._
 
 ## Intent
